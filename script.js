@@ -3804,11 +3804,11 @@ function eventStatus(item) {
     if (!Number.isNaN(dt))
       return now <= dt
         ? "OPEN · REGISTRATION TO " +
-            new Date(dt).toLocaleDateString(undefined, {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
+        new Date(dt).toLocaleDateString(undefined, {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
         : "CLOSED · REGISTRATION ENDED";
   }
   if (item.startDate) {
@@ -3816,11 +3816,11 @@ function eventStatus(item) {
     if (!Number.isNaN(sd))
       return now < sd
         ? "OPEN · STARTS " +
-            new Date(sd).toLocaleDateString(undefined, {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })
+        new Date(sd).toLocaleDateString(undefined, {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
         : "LIVE / CHECK EVENT PAGE";
   }
   return "OPEN SOURCE PAGE";
@@ -3855,7 +3855,7 @@ function catalogHealthCheck() {
   if (bad.length || badTargets.length)
     throw new Error(
       "Horizon catalog integrity failure: " +
-        [...bad, ...badTargets].map((x) => x.title || x.id).join(", "),
+      [...bad, ...badTargets].map((x) => x.title || x.id).join(", "),
     );
   if (hackathonResources.some((x) => x.status))
     throw new Error("Legacy hard-coded event status detected");
@@ -4018,6 +4018,18 @@ const features = [
     "A home view that surfaces the highest-value next step for the current profile.",
     "home",
   ],
+  [
+    "26",
+    "Contests & Arena",
+    "Verified contest radar, campus & global leaderboards, and AI anti-cheating integrity safeguard.",
+    "arena",
+  ],
+  [
+    "27",
+    "DSA & Practice Tracker",
+    "GitHub-style activity heatmap, topic breakdown, streak counter, and problem log for consistent DSA practice.",
+    "dsa",
+  ],
 ];
 
 const defaultState = {
@@ -4046,6 +4058,10 @@ const defaultState = {
   targetKind: "internship",
   theme: "atelier",
   focus: false,
+  contests: [],
+  leaderboard: [],
+  practiceLog: {},
+  solvedProblems: [],
 };
 
 let state;
@@ -4059,13 +4075,65 @@ try {
 state.targetProgram = state.targetProgram || "";
 state.targetKind =
   state.targetKind || (state.targetInternship ? "internship" : "internship");
+state.contests = Array.isArray(state.contests) ? state.contests : [];
+state.leaderboard = Array.isArray(state.leaderboard) ? state.leaderboard : [];
+state.practiceLog = (state.practiceLog && typeof state.practiceLog === 'object' && !Array.isArray(state.practiceLog)) ? state.practiceLog : {};
+state.solvedProblems = Array.isArray(state.solvedProblems) ? state.solvedProblems : [];
 
 function save() {
   try {
     localStorage.setItem("horizon-real-state-v4", JSON.stringify(state));
-  } catch (e) {}
+  } catch (e) { }
 }
-function esc(v) {
+
+// Seed 90 days of realistic practice activity if empty
+(function seedPracticeLog() {
+  if (Object.keys(state.practiceLog).length > 0) return;
+  const today = new Date();
+  const topics = ["Arrays", "Linked Lists", "Trees", "Dynamic Programming", "Graphs", "Strings", "Binary Search", "Greedy", "Backtracking", "Heap", "Two Pointers", "Sliding Window"];
+  const diffs = ["Easy", "Medium", "Hard"];
+  const platforms = ["LeetCode", "Codeforces", "GeeksForGeeks", "HackerRank"];
+  const counts = [0, 0, 1, 2, 1, 0, 0, 3, 4, 2, 1, 0, 0, 2, 5, 6, 4, 2, 1, 0, 0, 1, 3, 4, 3, 2, 0, 0, 4, 5, 3, 2, 1, 0, 0, 2, 4, 6, 5, 3, 1, 0, 0, 1, 2, 3, 4, 5, 3, 0, 0, 2, 3, 5, 4, 2, 1, 0, 0, 1, 2, 4, 5, 6, 4, 2, 0, 0, 1, 3, 4, 3, 2, 1, 0, 0, 2, 4, 5, 4, 3, 2, 0, 0, 1, 3, 5, 4, 2, 0];
+  const problemBanks = {
+    "Arrays": ["Two Sum", "Maximum Subarray", "Rotate Array", "Product of Array Except Self", "Trapping Rain Water", "Container With Most Water"],
+    "Linked Lists": ["Reverse Linked List", "Detect Cycle", "Merge Two Sorted Lists", "LRU Cache", "Flatten Multilevel List", "Add Two Numbers"],
+    "Trees": ["Binary Tree Inorder Traversal", "Maximum Depth", "Level Order Traversal", "Lowest Common Ancestor", "Serialize and Deserialize", "Path Sum II"],
+    "Dynamic Programming": ["Climbing Stairs", "Coin Change", "Longest Common Subsequence", "Edit Distance", "0/1 Knapsack", "House Robber II"],
+    "Graphs": ["Number of Islands", "Clone Graph", "Course Schedule", "Word Ladder", "Dijkstra Shortest Path", "Topological Sort"],
+    "Strings": ["Valid Parentheses", "Longest Palindromic Substring", "Group Anagrams", "Minimum Window Substring", "KMP Pattern Matching", "Rabin-Karp"],
+    "Binary Search": ["Binary Search", "Search in Rotated Array", "Find Peak Element", "Median of Two Sorted Arrays", "Koko Eating Bananas", "Capacity to Ship"],
+    "Greedy": ["Jump Game", "Interval Scheduling", "Task Scheduler", "Candy Distribution", "Meeting Rooms II", "Minimum Spanning Tree"],
+    "Backtracking": ["Subsets", "Permutations", "N-Queens", "Sudoku Solver", "Combination Sum", "Palindrome Partitioning"],
+    "Heap": ["Kth Largest Element", "Top K Frequent", "Merge K Sorted Lists", "Find Median from Data Stream", "Sliding Window Maximum", "Task Scheduler"],
+    "Two Pointers": ["3Sum", "Remove Duplicates", "Valid Palindrome", "Longest Substring Without Repeating", "Dutch National Flag", "Sort Colors"],
+    "Sliding Window": ["Maximum Sum Subarray K", "Longest Substring K Distinct", "Minimum Size Subarray Sum", "Fruit Into Baskets", "Permutation in String", "Find All Anagrams"]
+  };
+  let pid = 0;
+  for (let i = 89; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const cnt = counts[89 - i] || 0;
+    if (cnt > 0) state.practiceLog[key] = cnt;
+    for (let p = 0; p < cnt; p++) {
+      const topic = topics[pid % topics.length];
+      const bank = problemBanks[topic] || problemBanks["Arrays"];
+      const title = bank[pid % bank.length];
+      const diff = diffs[pid % 3 === 0 ? 0 : pid % 3 === 1 ? 1 : 2];
+      state.solvedProblems.push({
+        id: "seed-" + key + "-" + pid,
+        title: title,
+        topic: topic,
+        difficulty: diff,
+        date: key,
+        platform: platforms[pid % platforms.length],
+        notes: ""
+      });
+      pid++;
+    }
+  }
+  save();
+})(); function esc(v) {
   return String(v ?? "").replace(
     /[&<>"']/g,
     (c) =>
@@ -4188,7 +4256,7 @@ function roleMatch(c) {
     Math.min(
       100,
       (coreHits / Math.max(core.size, 1)) * 75 +
-        (tagHits / Math.max(tags.size, 1)) * 25,
+      (tagHits / Math.max(tags.size, 1)) * 25,
     ),
   );
 }
@@ -4392,6 +4460,7 @@ function nav() {
    <button onclick="route('home')">Home</button>
    <button onclick="route('discover')">Discover</button>
    <button onclick="route('target')">Target & Roadmap</button>
+   <button onclick="route('arena')" style="color:var(--accent);font-weight:800;position:relative">Contests &amp; Arena <span style="font-size:8px;background:var(--accent);color:#fff;padding:2px 5px;border-radius:999px;margin-left:3px;vertical-align:middle">LIVE</span></button>
    <button onclick="route('courses')">Course</button>
    <button onclick="route('internships')">Internship</button>
    <button onclick="route('hackathons')">Hackathon</button>
@@ -4419,17 +4488,20 @@ function route(name) {
         ? discoverView()
         : name === "target"
           ? `<div class="sectionhead"><span class="kicker">TARGET / ROADMAP</span><h3>Choose the destination. Build the route.</h3><p>Select an internship or job target after entering recognized skills. HORIZON then generates a target-specific roadmap with skill gaps, project evidence, interview preparation and application steps.</p></div>${targetPlannerView()}`
-          : name === "workspace"
-            ? workspaceView()
-            : name === "market"
-              ? marketView()
-              : name === "sources"
-                ? sourcesView()
-                : resourceView(name);
+          : name === "arena" || name === "contests"
+            ? arenaView()
+            : name === "workspace"
+              ? workspaceView()
+              : name === "market"
+                ? marketView()
+                : name === "sources"
+                  ? sourcesView()
+                  : resourceView(name);
   shell(`<section class="view active" id="view-${name}">${body}</section>`);
   if (name === "discover") renderCareerResults();
   if (name === "workspace") setPanel("overview");
   if (name === "market") drawChart();
+  if (name === "arena" || name === "contests") initArenaView();
   updateClock();
 }
 function skillTokens() {
@@ -4451,7 +4523,7 @@ function resourceScore(item) {
   return (
     Math.round(
       ([...mine].filter((s) => tags.has(s)).length / Math.max(mine.size, 1)) *
-        100,
+      100,
     ) / 100
   );
 }
@@ -4512,40 +4584,39 @@ function targetPlannerView() {
   const steps = buildTargetRoadmap(program, role);
   return `<section class="section"><div class="sectionhead"><span class="kicker">TARGET PLANNER / HOME</span><h3>Pick the destination. HORIZON builds the route.</h3><p>The target is a research and preparation plan, not a promise of employment. Choose internship, job, graduate/fresher or research routes; employer pages remain the source of truth for eligibility, location, deadlines and live openings.</p></div>
           <div class="card target-card" style="margin-bottom:15px"><div class="target-wrap"><div><span class="verified-source">TARGET TYPE</span><div class="target-actions" style="margin-top:8px">${Object.entries(
-            targetKindLabels,
-          )
-            .map(
-              ([k, label]) =>
-                `<button class="btn ${kind === k ? "primary" : ""}" onclick="setTargetKind('${k}')">${label}</button>`,
-            )
-            .join(
-              "",
-            )}</div></div><div><span class="verified-source">PROFILE SIGNAL</span><div class="quality-line"><span>${role.title}</span><b>${fitFor(role)}% skill match</b></div><div class="progress" style="margin-top:7px"><i style="width:${fitFor(role)}%"></i></div></div></div>
+    targetKindLabels,
+  )
+      .map(
+        ([k, label]) =>
+          `<button class="btn ${kind === k ? "primary" : ""}" onclick="setTargetKind('${k}')">${label}</button>`,
+      )
+      .join(
+        "",
+      )}</div></div><div><span class="verified-source">PROFILE SIGNAL</span><div class="quality-line"><span>${role.title}</span><b>${fitFor(role)}% skill match</b></div><div class="progress" style="margin-top:7px"><i style="width:${fitFor(role)}%"></i></div></div></div>
           <div style="height:14px"></div><label class="source">Target company + role</label><select class="field target-select" onchange="setTargetProgram(this.value)">${programs.length ? programs.map((p) => `<option value="${p.id}" ${p.id === program?.id ? "selected" : ""}>${esc(p.company)} — ${esc(p.title)}</option>`).join("") : allRolePrograms.map((p) => `<option disabled>${esc(p.company)} — ${esc(p.title)} • complete skill match required</option>`).join("")}</select><div class="quality-line"><span>${program ? esc(program.locationNote || "") : "No eligible target route yet."}</span><span>${program ? esc(program.sourceLabel) : "Enter more recognized skills"}</span></div></div>
-          ${
-            program
-              ? `<div class="target-wrap"><article class="card target-card"><span class="verified-source">TARGET DETAILS</span><h3 style="font:800 27px Fraunces;margin:8px 0">${esc(program.company)} · ${esc(program.title)}</h3><div class="target-grid"><div class="target-stat"><span class="source">Core skills matched</span><b>${role.skills.length - missing.length}/${role.skills.length}</b></div><div class="target-stat"><span class="source">Current gaps</span><b>${missing.length}</b></div><div class="target-stat"><span class="source">Roadmap stages</span><b>${steps.length}</b></div></div><div class="tags">${(
-                  program.tags || []
-                )
-                  .slice(0, 10)
-                  .map(
-                    (s) =>
-                      `<span class="tag">${profileSkillSet().has(normalizeSkill(s)) ? "✓ " : ""}${esc(s)}</span>`,
-                  )
-                  .join(
-                    "",
-                  )}</div><div class="live-note"><b>Source discipline:</b> target program details are based on the linked employer/program page. HORIZON does not claim that this exact opening is available to you now.</div><div class="target-actions"><a class="btn primary" href="${esc(sourceTargetLink(program))}" target="_blank" rel="noopener">Open official target source ↗</a>${targetCompany ? `<a class="btn" href="${esc(targetCompany.url)}" target="_blank" rel="noopener">Company careers ↗</a>` : ""}</div></article><article class="card target-card"><span class="verified-source">YOUR NEXT 3 MOVES</span><div class="list" style="margin-top:9px">${steps
-                  .slice(0, 3)
-                  .map(
-                    (st, i) =>
-                      `<div class="listrow"><span class="badge">${String(i + 1).padStart(2, "0")}</span><b style="flex:1">${esc(st.title)}</b></div>`,
-                  )
-                  .join(
-                    "",
-                  )}</div><div class="target-actions"><button class="btn primary" onclick="generateTargetRoadmap('${esc(role.id)}')">Add full roadmap to planner</button><button class="btn" onclick="route('courses')">Matched learning</button></div></article></div>
+          ${program
+      ? `<div class="target-wrap"><article class="card target-card"><span class="verified-source">TARGET DETAILS</span><h3 style="font:800 27px Fraunces;margin:8px 0">${esc(program.company)} · ${esc(program.title)}</h3><div class="target-grid"><div class="target-stat"><span class="source">Core skills matched</span><b>${role.skills.length - missing.length}/${role.skills.length}</b></div><div class="target-stat"><span class="source">Current gaps</span><b>${missing.length}</b></div><div class="target-stat"><span class="source">Roadmap stages</span><b>${steps.length}</b></div></div><div class="tags">${(
+        program.tags || []
+      )
+        .slice(0, 10)
+        .map(
+          (s) =>
+            `<span class="tag">${profileSkillSet().has(normalizeSkill(s)) ? "✓ " : ""}${esc(s)}</span>`,
+        )
+        .join(
+          "",
+        )}</div><div class="live-note"><b>Source discipline:</b> target program details are based on the linked employer/program page. HORIZON does not claim that this exact opening is available to you now.</div><div class="target-actions"><a class="btn primary" href="${esc(sourceTargetLink(program))}" target="_blank" rel="noopener">Open official target source ↗</a>${targetCompany ? `<a class="btn" href="${esc(targetCompany.url)}" target="_blank" rel="noopener">Company careers ↗</a>` : ""}</div></article><article class="card target-card"><span class="verified-source">YOUR NEXT 3 MOVES</span><div class="list" style="margin-top:9px">${steps
+          .slice(0, 3)
+          .map(
+            (st, i) =>
+              `<div class="listrow"><span class="badge">${String(i + 1).padStart(2, "0")}</span><b style="flex:1">${esc(st.title)}</b></div>`,
+          )
+          .join(
+            "",
+          )}</div><div class="target-actions"><button class="btn primary" onclick="generateTargetRoadmap('${esc(role.id)}')">Add full roadmap to planner</button><button class="btn" onclick="route('courses')">Matched learning</button></div></article></div>
           <div class="card target-card" style="margin-top:15px"><span class="kicker">COMPLETE TARGET ROADMAP</span><h3 style="font:800 30px Fraunces;margin:7px 0">${esc(program.company)} → ${esc(program.title)}</h3><p style="color:var(--muted);font-size:12px">Every stage ends in evidence. The roadmap adapts its gap work to the skills you entered and keeps employer-specific requirements tied to the official source.</p><div class="roadmap-track">${steps.map((st, i) => `<div class="roadmap-node"><div class="num">STAGE ${String(i + 1).padStart(2, "0")}</div><h4>${esc(st.title)}</h4><p>${esc(st.body)}</p>${st.skill ? `<span class="tag">${esc(st.skill)}</span>` : ""}${st.source ? `<div class="source" style="margin-top:7px">${esc(st.source)}</div>` : ""}</div>`).join("")}</div>${missing.length ? `<div class="danger-note" style="margin-top:12px"><b>Priority gaps:</b> ${esc(missing.join(", "))}. Close these before treating the target as application-ready.</div>` : `<div class="live-note"><b>Core role coverage:</b> every core occupation skill is recognized on the current profile. Shift effort to evidence, interviews and target-specific requirements.</div>`}</div>`
-              : ""
-          }</section>`;
+      : ""
+    }</section>`;
 }
 
 function buildTargetRoadmap(program, role) {
@@ -4579,7 +4650,7 @@ function buildTargetRoadmap(program, role) {
     "Master the technical foundation",
     "Use deliberate practice for coding, debugging, DSA, databases, APIs and testing at the level appropriate to the target role.",
     role.demands?.slice(0, 4).join(" / ") ||
-      role.skills.slice(0, 4).join(" / "),
+    role.skills.slice(0, 4).join(" / "),
     "Career pathway",
   );
   if (program?.id.includes("mastercard"))
@@ -4713,11 +4784,11 @@ function homeView() {
           <div class="card sim" id="tilt">
             <div class="simtop"><div><span class="kicker">PROFILE MATCH</span><h3 style="font:800 26px Fraunces;margin-top:5px">${esc(top.title)}</h3></div><span class="badge">${fitFor(top)}% MATCH</span></div>
             <div class="skillgrid">${Object.entries(state.skill)
-              .map(
-                ([k, v]) =>
-                  `<div class="metric"><span>${k}</span><b>${v}%</b><div class="progress" style="margin-top:8px"><i style="width:${v}%"></i></div></div>`,
-              )
-              .join("")}</div>
+      .map(
+        ([k, v]) =>
+          `<div class="metric"><span>${k}</span><b>${v}%</b><div class="progress" style="margin-top:8px"><i style="width:${v}%"></i></div></div>`,
+      )
+      .join("")}</div>
             <div style="height:12px"></div><div class="metric"><span>Next useful action</span><b style="font-size:16px">${esc(nextAction())}</b></div>
             <div class="quality-line"><span>Match score is calculated from your profile</span><span>${state.skills.length ? "No static baseline" : "Enter skills to calculate"}</span></div>
           </div>
@@ -4729,33 +4800,33 @@ function homeView() {
           <div class="sectionhead"><span class="kicker">CAREER SNAPSHOT</span><h3>Profile → growth → opportunity → gap → track.</h3><p>The path is built around the data you provide instead of a fake student record.</p></div>
           <div class="intel-grid">
             <article class="card intel-card wide"><span class="kicker">PROFILE</span><h4>${esc(state.name || "Your profile")} / ${esc(state.field || "add your field")}</h4><p>${esc(state.interests || "Add interests so the recommendation layer can use them.")}</p><div class="tags">${(state
-              .skills.length
-              ? state.skills
-              : ["Add real skills"]
-            )
-              .slice(0, 7)
-              .map((s) => `<span class="tag">${esc(s)}</span>`)
-              .join(
-                "",
-              )}</div><button class="mini" onclick="openProfile()">Update profile ↗</button></article>
+      .skills.length
+      ? state.skills
+      : ["Add real skills"]
+    )
+      .slice(0, 7)
+      .map((s) => `<span class="tag">${esc(s)}</span>`)
+      .join(
+        "",
+      )}</div><button class="mini" onclick="openProfile()">Update profile ↗</button></article>
             <article class="card intel-card"><span class="kicker">GROWTH</span><div class="intel-value">${top.growth}%</div><p>Current U.S. BLS projection for the occupation, 2025–35.</p><button class="mini" onclick="route('market')">Market radar ↗</button></article>
             <article class="card intel-card"><span class="kicker">TARGET INTERNSHIP</span><div style="font:800 22px Fraunces">${esc(internshipTargetFor(top))}</div><p>Target title generated from the selected role; it is not presented as a guaranteed opening.</p><button class="mini" onclick="route('internships')">Check live portals ↗</button></article>
             <article class="card intel-card"><span class="kicker">DEMANDS</span><h4>What the path asks for</h4><div class="tags">${demandSkills
-              .slice(0, 7)
-              .map((s) => `<span class="tag">${esc(s)}</span>`)
-              .join(
-                "",
-              )}</div><p>Requirements are anchored to the occupation record and current employer-signal sources where available.</p></article>
+      .slice(0, 7)
+      .map((s) => `<span class="tag">${esc(s)}</span>`)
+      .join(
+        "",
+      )}</div><p>Requirements are anchored to the occupation record and current employer-signal sources where available.</p></article>
             <article class="card intel-card"><span class="kicker">SKILL SET</span><h4>Your current evidence</h4><div class="tags">${(state
-              .skills.length
-              ? state.skills
-              : ["No skills entered"]
-            )
-              .slice(0, 7)
-              .map((s) => `<span class="tag">${esc(s)}</span>`)
-              .join(
-                "",
-              )}</div><button class="mini" onclick="rerenderWorkspace('skills')">Calibrate ↗</button></article>
+      .skills.length
+      ? state.skills
+      : ["No skills entered"]
+    )
+      .slice(0, 7)
+      .map((s) => `<span class="tag">${esc(s)}</span>`)
+      .join(
+        "",
+      )}</div><button class="mini" onclick="rerenderWorkspace('skills')">Calibrate ↗</button></article>
             <article class="card intel-card"><span class="kicker">GAP</span><div class="intel-value">${missing.length}</div><p>Current missing core skill tags for the target role.</p><button class="mini" onclick="rerenderWorkspace('gaps')">Audit gap ↗</button></article>
             <article class="card intel-card wide"><span class="kicker">TRACK</span><h4>${esc((top.tracks || ["Explore a track"])[0])} → ${(top.tracks || []).slice(1, 4).map(esc).join(" → ")}</h4><p>Possible directions inside ${esc(top.title)}; the app keeps this as a research map, not a ranking.</p><div class="tags">${(top.tracks || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div></article>
           </div>
@@ -4768,13 +4839,13 @@ function homeView() {
 
         <section class="section"><div class="sectionhead"><span class="kicker">ROLE-SPECIFIC LEARNING</span><h3>Suggested learning sequence.</h3><p>Horizon filters the course catalog again using the selected target role, not just a generic tag cloud.</p></div>
           <div class="resource-grid">${(coursePlaybooks[top.id] || [])
-            .map((x) => {
-              const item = courseResources.find((r) => r.title === x[0]);
-              return item
-                ? resourceCard({ ...item, _score: resourceScore(item) })
-                : "";
-            })
-            .join("")}</div>
+      .map((x) => {
+        const item = courseResources.find((r) => r.title === x[0]);
+        return item
+          ? resourceCard({ ...item, _score: resourceScore(item) })
+          : "";
+      })
+      .join("")}</div>
         </section>
 
         <section class="section">
@@ -4863,31 +4934,329 @@ function resourceView(name) {
           <div style="height:16px"></div><div class="card"><span class="kicker">SOURCE DISCIPLINE</span><h3 style="font:800 25px Fraunces;margin:7px 0">Official links first.</h3><p style="color:var(--muted);font-size:12px">Horizon prioritizes official learning providers, company career portals and established hackathon directories. A live listing can close or change after this page was built, so the source link is the authority for the final application decision.</p></div>`;
 }
 
+
+// ===== DSA & PRACTICE TRACKER =====
+
+function renderActivityHeatmap() {
+  const today = new Date();
+  const weeks = 16;
+  const totalDays = weeks * 7;
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - totalDays + 1);
+
+  // Find max count for intensity scaling
+  const allCounts = Object.values(state.practiceLog || {});
+  const maxCount = allCounts.length ? Math.max(...allCounts, 1) : 1;
+
+  // Build day cells array
+  const days = [];
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const count = state.practiceLog[key] || 0;
+    const level = count === 0 ? 0 : count < maxCount * 0.25 ? 1 : count < maxCount * 0.5 ? 2 : count < maxCount * 0.75 ? 3 : 4;
+    const label = count === 0 ? 'No problems solved' : count + ' problem' + (count > 1 ? 's' : '') + ' solved';
+    days.push({ key, count, level, label, dayOfWeek: d.getDay(), date: d });
+  }
+
+  // Month labels
+  const monthLabels = [];
+  let lastMonth = -1;
+  for (let i = 0; i < totalDays; i += 7) {
+    const d = days[i].date;
+    const month = d.getMonth();
+    if (month !== lastMonth) {
+      monthLabels.push({ col: i / 7, label: d.toLocaleDateString('en-US', { month: 'short' }) });
+      lastMonth = month;
+    } else {
+      monthLabels.push({ col: i / 7, label: '' });
+    }
+  }
+
+  const weekLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const totalSolved = Object.values(state.practiceLog || {}).reduce((a, b) => a + b, 0);
+  const streak = getDSAStreak();
+  const longestStreak = getDSALongestStreak();
+  const todayKey = today.toISOString().slice(0, 10);
+  const todaySolved = state.practiceLog[todayKey] || 0;
+
+  return `
+  <div class="heatmap-container">
+    <div class="heatmap-header">
+      <div>
+        <span class="kicker">ACTIVITY HEATMAP / LAST 16 WEEKS</span>
+        <div class="heatmap-stats-row">
+          <div class="heatmap-stat"><span>${totalSolved}</span><label>Problems Solved</label></div>
+          <div class="heatmap-stat"><span>${streak}</span><label>Current Streak 🔥</label></div>
+          <div class="heatmap-stat"><span>${longestStreak}</span><label>Longest Streak</label></div>
+          <div class="heatmap-stat"><span>${todaySolved}</span><label>Today</label></div>
+        </div>
+      </div>
+      <div class="heatmap-legend">
+        <span style="font:700 9px 'Space Mono';color:var(--soft)">LESS</span>
+        <div class="heat-cell level-0"></div>
+        <div class="heat-cell level-1"></div>
+        <div class="heat-cell level-2"></div>
+        <div class="heat-cell level-3"></div>
+        <div class="heat-cell level-4"></div>
+        <span style="font:700 9px 'Space Mono';color:var(--soft)">MORE</span>
+      </div>
+    </div>
+    <div class="heatmap-grid-wrap">
+      <div class="heatmap-week-labels">
+        ${weekLabels.map((d, i) => `<span style="opacity:${[1, 3, 5].includes(i) ? 1 : 0.3}">${d}</span>`).join('')}
+      </div>
+      <div class="heatmap-scroll">
+        <div class="heatmap-month-labels">
+          ${monthLabels.map(m => `<span>${m.label}</span>`).join('')}
+        </div>
+        <div class="heatmap-grid" style="grid-template-rows: repeat(7, 13px); grid-template-columns: repeat(${weeks}, 13px);">
+          ${days.map((d, i) => {
+    const col = Math.floor(i / 7) + 1;
+    const row = (i % 7) + 1;
+    return `<div class="heat-cell level-${d.level}" style="grid-column:${col};grid-row:${row}" title="${d.key}: ${d.label}" onclick="dsaOpenDayDetail('${d.key}')"></div>`;
+  }).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function getDSAStreak() {
+  const today = new Date();
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    if ((state.practiceLog[key] || 0) > 0) streak++;
+    else if (i > 0) break;
+  }
+  return streak;
+}
+
+function getDSALongestStreak() {
+  const keys = Object.keys(state.practiceLog || {}).filter(k => state.practiceLog[k] > 0).sort();
+  let max = 0, cur = 0, prev = null;
+  for (const k of keys) {
+    if (!prev) { cur = 1; }
+    else {
+      const d1 = new Date(prev), d2 = new Date(k);
+      const diff = (d2 - d1) / 86400000;
+      cur = diff === 1 ? cur + 1 : 1;
+    }
+    if (cur > max) max = cur;
+    prev = k;
+  }
+  return max;
+}
+
+function getDSATopic(filters) {
+  const problems = (state.solvedProblems || []).filter(p => !p.id.startsWith('seed-') || true);
+  const topicCounts = {};
+  for (const p of problems) {
+    const t = p.topic || 'Other';
+    topicCounts[t] = (topicCounts[t] || 0) + 1;
+  }
+  return topicCounts;
+}
+
+function dsaOpenDayDetail(dateKey) {
+  const problems = (state.solvedProblems || []).filter(p => p.date === dateKey);
+  const count = state.practiceLog[dateKey] || 0;
+  const d = new Date(dateKey);
+  const label = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  openModal(`<div class="modalhead"><div><span class="kicker">DSA ACTIVITY / ${dateKey}</span><h3 style="font:800 26px Fraunces;margin-top:6px">${label}</h3></div><button class="close" onclick="closeModal()">✕</button></div>
+  ${count > 0
+      ? `<p style="color:var(--muted);font-size:13px;margin-bottom:14px">${count} problem${count > 1 ? 's' : ''} solved on this day.</p>
+      <div class="list">
+      ${problems.map(p => `<div class="listrow"><span class="badge" style="background:${p.difficulty === 'Easy' ? 'rgba(74,163,99,0.18)' : p.difficulty === 'Medium' ? 'rgba(224,140,50,0.18)' : 'rgba(166,77,63,0.18)'};color:${p.difficulty === 'Easy' ? 'var(--green)' : p.difficulty === 'Medium' ? '#e08c32' : 'var(--danger)'}">${p.difficulty}</span><b style="flex:1">${p.title}</b><span style="font:700 9px 'Space Mono';color:var(--soft)">${p.platform}</span></div>`).join('')}
+      </div>`
+      : `<div class="empty">No problems solved on this day.</div>`}
+  <div style="height:14px"></div>
+  <button class="btn primary" onclick="dsaLogTodayFromModal('${dateKey}')">+ Log a Problem on this Day</button>`);
+}
+
+function dsaLogTodayFromModal(dateKey) {
+  closeModal();
+  setTimeout(() => { route('workspace'); setTimeout(() => setPanel('dsa'), 100); }, 100);
+}
+
+let dsaFilterDiff = 'all';
+let dsaFilterTopic = 'all';
+
+function dsaTrackerPanel() {
+  const solved = state.solvedProblems || [];
+  const totalSolved = Object.values(state.practiceLog || {}).reduce((a, b) => a + b, 0);
+  const streak = getDSAStreak();
+  const topicMap = getDSATopic();
+  const sortedTopics = Object.entries(topicMap).sort((a, b) => b[1] - a[1]);
+  const topTopic = sortedTopics[0] ? sortedTopics[0][0] : 'None';
+
+  const easy = solved.filter(p => p.difficulty === 'Easy').length;
+  const medium = solved.filter(p => p.difficulty === 'Medium').length;
+  const hard = solved.filter(p => p.difficulty === 'Hard').length;
+
+  const recentProblems = [...solved].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
+
+  return `<div class="card dsa-tracker-card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:18px">
+    <div>
+      <span class="kicker">DSA &amp; PRACTICE TRACKER</span>
+      <h3 style="font:800 31px Fraunces;margin:6px 0">Consistency beats intensity.</h3>
+      <p style="color:var(--muted);font-size:13px">Your GitHub-style practice heatmap — every solved problem recorded, every streak counted.</p>
+    </div>
+    <button class="btn primary" onclick="dsaOpenLogModal()">+ Log Problem</button>
+  </div>
+
+  <!-- Stat Pills -->
+  <div class="dsa-stats-pills">
+    <div class="dsa-stat-pill"><b>${totalSolved}</b><span>Total Solved</span></div>
+    <div class="dsa-stat-pill"><b style="color:var(--green)">${streak}🔥</b><span>Current Streak</span></div>
+    <div class="dsa-stat-pill"><b style="color:var(--green)">${easy}</b><span>Easy</span></div>
+    <div class="dsa-stat-pill"><b style="color:#e08c32">${medium}</b><span>Medium</span></div>
+    <div class="dsa-stat-pill"><b style="color:var(--danger)">${hard}</b><span>Hard</span></div>
+    <div class="dsa-stat-pill"><b>${topTopic}</b><span>Top Topic</span></div>
+  </div>
+
+  <!-- Heatmap -->
+  ${renderActivityHeatmap()}
+
+  <!-- Topic Breakdown Bar Chart -->
+  <div style="margin-top:24px">
+    <span class="kicker">TOPIC BREAKDOWN</span>
+    <div class="dsa-topic-bars">
+    ${sortedTopics.slice(0, 8).map(([topic, cnt]) => {
+    const pct = totalSolved > 0 ? Math.round((cnt / totalSolved) * 100) : 0;
+    return `<div class="dsa-topic-row">
+        <span class="dsa-topic-label">${topic}</span>
+        <div class="dsa-topic-bar-wrap">
+          <div class="dsa-topic-bar" style="width:${pct}%"></div>
+        </div>
+        <span class="dsa-topic-count">${cnt}</span>
+      </div>`;
+  }).join('')}
+    </div>
+  </div>
+
+  <!-- Difficulty Donut-Style Progress -->
+  <div class="dsa-diff-grid" style="margin-top:20px">
+    <div class="dsa-diff-card easy-diff">
+      <span class="kicker">EASY</span>
+      <div class="dsa-diff-num">${easy}</div>
+      <div class="progress" style="margin-top:6px"><i style="width:${totalSolved > 0 ? Math.round((easy / totalSolved) * 100) : 0}%;background:var(--green)"></i></div>
+    </div>
+    <div class="dsa-diff-card med-diff">
+      <span class="kicker">MEDIUM</span>
+      <div class="dsa-diff-num">${medium}</div>
+      <div class="progress" style="margin-top:6px"><i style="width:${totalSolved > 0 ? Math.round((medium / totalSolved) * 100) : 0}%;background:#e08c32"></i></div>
+    </div>
+    <div class="dsa-diff-card hard-diff">
+      <span class="kicker">HARD</span>
+      <div class="dsa-diff-num">${hard}</div>
+      <div class="progress" style="margin-top:6px"><i style="width:${totalSolved > 0 ? Math.round((hard / totalSolved) * 100) : 0}%;background:var(--danger)"></i></div>
+    </div>
+  </div>
+
+  <!-- Recent Problems Log -->
+  <div style="margin-top:24px">
+    <span class="kicker">RECENT PROBLEMS</span>
+    <div class="list" style="margin-top:10px">
+    ${recentProblems.length
+      ? recentProblems.map(p => `<div class="listrow">
+          <span class="badge" style="background:${p.difficulty === 'Easy' ? 'rgba(74,163,99,0.18)' : p.difficulty === 'Medium' ? 'rgba(224,140,50,0.18)' : 'rgba(166,77,63,0.18)'};color:${p.difficulty === 'Easy' ? 'var(--green)' : p.difficulty === 'Medium' ? '#e08c32' : 'var(--danger)'};width:52px;text-align:center">${p.difficulty}</span>
+          <span style="flex:1"><b>${p.title}</b><span style="margin-left:8px;font:700 9px 'Space Mono';color:var(--soft)">${p.topic}</span></span>
+          <span style="font:700 9px 'Space Mono';color:var(--muted)">${p.platform}</span>
+          <span style="font:700 9px 'Space Mono';color:var(--soft);margin-left:10px">${p.date}</span>
+          <button class="mini" onclick="dsaDeleteProblem('${p.id}')">✕</button>
+        </div>`).join('')
+      : '<div class="empty">No problems logged yet. Click "+ Log Problem" to start tracking.</div>'}
+    </div>
+  </div>
+</div>`;
+}
+
+function dsaOpenLogModal() {
+  const topics = ["Arrays", "Linked Lists", "Trees", "Dynamic Programming", "Graphs", "Strings", "Binary Search", "Greedy", "Backtracking", "Heap", "Two Pointers", "Sliding Window", "Stack", "Queue", "Trie", "Bit Manipulation", "Math", "Other"];
+  const today = new Date().toISOString().slice(0, 10);
+  openModal(`<div class="modalhead"><div><span class="kicker">LOG PROBLEM / DSA TRACKER</span><h3 style="font:800 28px Fraunces;margin-top:5px">Add a solved problem</h3></div><button class="close" onclick="closeModal()">✕</button></div>
+  <div class="grid2" style="margin-top:12px">
+    <input id="dsaTitle" class="field" placeholder="Problem title (e.g. Two Sum)" style="grid-column:1/-1">
+    <select id="dsaTopic" class="field">${topics.map(t => `<option value="${t}">${t}</option>`).join('')}</select>
+    <select id="dsaDiff" class="field">
+      <option value="Easy">Easy</option>
+      <option value="Medium" selected>Medium</option>
+      <option value="Hard">Hard</option>
+    </select>
+    <select id="dsaPlatform" class="field">
+      <option>LeetCode</option><option>Codeforces</option><option>GeeksForGeeks</option><option>HackerRank</option><option>AtCoder</option><option>SPOJ</option><option>Other</option>
+    </select>
+    <input id="dsaDate" class="field" type="date" value="${today}">
+  </div>
+  <textarea id="dsaNotes" class="field" style="width:100%;margin-top:10px;height:70px" placeholder="Notes (optional, e.g. approach, complexity, edge cases)…"></textarea>
+  <div style="height:14px"></div>
+  <button class="btn primary" onclick="dsaSaveProblem()">Save Problem</button>`);
+}
+
+function dsaSaveProblem() {
+  const title = (document.getElementById('dsaTitle')?.value || '').trim();
+  if (!title) { toast('Enter the problem title.'); return; }
+  const topic = document.getElementById('dsaTopic')?.value || 'Other';
+  const difficulty = document.getElementById('dsaDiff')?.value || 'Medium';
+  const platform = document.getElementById('dsaPlatform')?.value || 'LeetCode';
+  const date = document.getElementById('dsaDate')?.value || new Date().toISOString().slice(0, 10);
+  const notes = (document.getElementById('dsaNotes')?.value || '').trim();
+  const id = 'dsa-' + Date.now();
+  state.solvedProblems.push({ id, title, topic, difficulty, date, platform, notes });
+  state.practiceLog[date] = (state.practiceLog[date] || 0) + 1;
+  save();
+  closeModal();
+  toast('Problem logged! Keep the streak alive 🔥');
+  rerenderWorkspace('dsa');
+}
+
+function dsaDeleteProblem(id) {
+  const idx = state.solvedProblems.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  const p = state.solvedProblems[idx];
+  state.solvedProblems.splice(idx, 1);
+  if (p.date && state.practiceLog[p.date]) {
+    state.practiceLog[p.date] = Math.max(0, (state.practiceLog[p.date] || 1) - 1);
+    if (state.practiceLog[p.date] === 0) delete state.practiceLog[p.date];
+  }
+  save();
+  rerenderWorkspace('dsa');
+}
+
+// ===== END DSA TRACKER =====
 function workspaceView() {
   return `<div class="sectionhead"><span class="kicker">MY WORKSPACE</span><h3>Your career cockpit.</h3><p>Every module below edits the same saved local profile.</p></div>
  <div class="split"><aside class="card sidebar">${[
-   ["overview", "Overview"],
-   ["roadmap", "Roadmap"],
-   ["skills", "Skill Lab"],
-   ["gaps", "Skill Gaps"],
-   ["projects", "Projects"],
-   ["applications", "Applications"],
-   ["planner", "Planner"],
-   ["assessment", "Assessment"],
-   ["journal", "Journal"],
-   ["analytics", "Analytics"],
-   ["compare", "Compare"],
-   ["saved", "Saved Careers"],
-   ["profile", "Profile"],
-   ["settings", "Settings"],
- ]
-   .map(
-     (x) =>
-       `<button class="sidebtn" data-panel="${x[0]}" onclick="setPanel('${x[0]}')">${x[1]}</button>`,
-   )
-   .join("")}</aside>
+      ["overview", "Overview"],
+      ["roadmap", "Roadmap"],
+      ["skills", "Skill Lab"],
+      ["gaps", "Skill Gaps"],
+      ["projects", "Projects"],
+      ["applications", "Applications"],
+      ["planner", "Planner"],
+      ["assessment", "Assessment"],
+      ["journal", "Journal"],
+      ["analytics", "Analytics"],
+      ["compare", "Compare"],
+      ["saved", "Saved Careers"],
+      ["profile", "Profile"],
+      ["dsa", "DSA Tracker 🔥"],
+      ["settings", "Settings"],
+    ]
+      .map(
+        (x) =>
+          `<button class="sidebtn" data-panel="${x[0]}" onclick="setPanel('${x[0]}')">${x[1]}</button>`,
+      )
+      .join("")}</aside>
  <main>
- ${panel("overview", overviewPanel())}${panel("roadmap", roadmapPanel())}${panel("skills", skillPanel())}${panel("gaps", gapPanel())}${panel("projects", projectPanel())}${panel("applications", applicationsPanel())}${panel("planner", plannerPanel())}${panel("assessment", assessmentPanel())}${panel("journal", journalPanel())}${panel("analytics", analyticsPanel())}${panel("compare", comparePanel())}${panel("saved", savedPanel())}${panel("profile", profilePanel())}${panel("settings", settingsPanel())}
+ ${panel("overview", overviewPanel())}${panel("roadmap", roadmapPanel())}${panel("skills", skillPanel())}${panel("gaps", gapPanel())}${panel("projects", projectPanel())}${panel("applications", applicationsPanel())}${panel("planner", plannerPanel())}${panel("assessment", assessmentPanel())}${panel("journal", journalPanel())}${panel("analytics", analyticsPanel())}${panel("compare", comparePanel())}${panel("dsa", dsaTrackerPanel())}${panel("saved", savedPanel())}${panel("profile", profilePanel())}${panel("settings", settingsPanel())}
  </main></div>`;
 }
 function panel(id, html) {
@@ -4916,8 +5285,8 @@ function overviewPanel() {
     .join("")}</div>
  <div style="height:15px"></div><div class="grid3"><div class="card"><span class="kicker">PROFILE</span><div style="font:800 43px Fraunces;margin:6px 0">${profilePercent()}%</div><div class="progress"><i style="width:${profilePercent()}%"></i></div></div><div class="card"><span class="kicker">PROJECTS</span><div style="font:800 43px Fraunces">${state.projects.length}</div><p style="color:var(--muted);font-size:12px">Portfolio evidence pieces</p></div><div class="card"><span class="kicker">APPLICATIONS</span><div style="font:800 43px Fraunces">${state.applications.length}</div><p style="color:var(--muted);font-size:12px">Tracked opportunities</p></div></div>
  <div style="height:15px"></div><div class="card"><span class="kicker">TOP PATH SIGNAL</span><h3 style="font:800 27px Fraunces;margin:7px 0">${esc(ranked()[0].title)}</h3><p style="color:var(--muted);font-size:13px">${esc(ranked()[0].desc)}</p><div class="tags">${ranked()[0]
-   .skills.map((s) => `<span class="tag">${esc(s)}</span>`)
-   .join("")}</div></div>`;
+      .skills.map((s) => `<span class="tag">${esc(s)}</span>`)
+      .join("")}</div></div>`;
 }
 function roadmapPanel() {
   const steps = [
@@ -4964,15 +5333,14 @@ function applicationsPanel() {
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><span class="kicker">APPLICATION TRACKER</span><h3 style="font:800 31px Fraunces">Opportunity pipeline.</h3></div><button class="btn primary" onclick="newApplication()">+ Add opportunity</button></div><div style="height:16px"></div><div class="appgrid">${stages
     .map(
       (stage) =>
-        `<div class="card soft kanban"><h4>${stage}</h4>${
-          state.applications
-            .filter((a) => a.status === stage)
-            .map(
-              (a, i) =>
-                `<div class="card"><b>${esc(a.role)}</b><div style="font-size:10px;color:var(--soft);margin-top:3px">${esc(a.company)}</div><div style="font-size:10px;color:var(--muted);margin-top:7px">${esc(a.next)}</div><button class="mini" onclick="cycleApplication('${a.id}')">Move →</button></div>`,
-            )
-            .join("") ||
-          `<div class="empty" style="padding:18px;font-size:10px">Empty</div>`
+        `<div class="card soft kanban"><h4>${stage}</h4>${state.applications
+          .filter((a) => a.status === stage)
+          .map(
+            (a, i) =>
+              `<div class="card"><b>${esc(a.role)}</b><div style="font-size:10px;color:var(--soft);margin-top:3px">${esc(a.company)}</div><div style="font-size:10px;color:var(--muted);margin-top:7px">${esc(a.next)}</div><button class="mini" onclick="cycleApplication('${a.id}')">Move →</button></div>`,
+          )
+          .join("") ||
+        `<div class="empty" style="padding:18px;font-size:10px">Empty</div>`
         }</div>`,
     )
     .join("")}</div></div>`;
@@ -5028,9 +5396,9 @@ function analyticsPanel() {
     done = state.tasks.filter((x) => x.done).length,
     projectProgress = state.projects.length
       ? Math.round(
-          state.projects.reduce((a, b) => a + b.progress, 0) /
-            state.projects.length,
-        )
+        state.projects.reduce((a, b) => a + b.progress, 0) /
+        state.projects.length,
+      )
       : 0;
   return `<div class="grid2"><div class="card"><span class="kicker">PROFILE</span><h3 style="font:800 40px Fraunces">${profilePercent()}%</h3><div class="progress"><i style="width:${profilePercent()}%"></i></div><p class="source" style="margin-top:7px">Completeness is based only on fields stored by Horizon.</p></div><div class="card"><span class="kicker">TASKS</span><h3 style="font:800 40px Fraunces">${Math.round((done / taskTotal) * 100)}%</h3><div class="progress"><i style="width:${Math.round((done / taskTotal) * 100)}%"></i></div><p class="source" style="margin-top:7px">${done} of ${state.tasks.length} tasks complete</p></div></div><div style="height:15px"></div><div class="grid2"><div class="card"><span class="kicker">PROJECT EVIDENCE</span><h3 style="font:800 40px Fraunces">${projectProgress}%</h3><div class="progress"><i style="width:${projectProgress}%"></i></div></div><div class="card"><span class="kicker">INTEREST COVERAGE</span><h3 style="font:800 40px Fraunces">${state.interests ? 100 : 0}%</h3><p class="source">Add interests to improve the context shown by the dashboard.</p></div></div>`;
 }
@@ -5049,155 +5417,1238 @@ function savedPanel() {
   return `<div class="card"><span class="kicker">SAVED CAREERS</span><h3 style="font:800 31px Fraunces">Your shortlist.</h3><div style="height:16px"></div>${list.length ? `<div class="career-grid">${list.map((c) => careerCard(c)).join("")}</div>` : '<div class="empty">Save a career from Discover to build a shortlist.</div>'}</div>`;
 }
 function profilePanel() {
-  return `<div class="card"><div class="profile-head"><div class="avatar">${esc(initials())}</div><div><span class="kicker">PROFILE INTELLIGENCE</span><h3 style="font:800 31px Fraunces">${esc(state.name || "Student")}</h3></div></div><div style="height:16px"></div><div class="grid2"><div><label class="source">Name</label><input id="pName" class="field" style="width:100%" value="${esc(state.name)}"></div><div><label class="source">Email</label><input id="pEmail" class="field" style="width:100%" value="${esc(state.email)}"></div><div><label class="source">Field / degree</label><input id="pField" class="field" style="width:100%" value="${esc(state.field)}"></div><div><label class="source">Goal</label><select id="pGoal" class="field" style="width:100%">${["Explore", "Internship", "Placement", "Research", "Startup"].map((x) => `<option ${state.goal === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div><div style="height:10px"></div><label class="source">Interests</label><textarea id="pInterests" class="field" rows="3" style="width:100%" placeholder="AI, medicine, finance, climate…">${esc(state.interests)}</textarea><div style="height:10px"></div><label class="source">Skills — comma separated (recognized skills only)</label><input id="pSkills" class="field" style="width:100%" value="${esc(state.skills.join(", "))}" placeholder="Python, SQL, Figma, communication"><div class="source" style="margin-top:6px">Unsupported skill names are rejected rather than used to create a match.</div><div style="height:14px"></div><button class="btn primary" onclick="saveProfileFields()">Save profile</button><div class="live-note" style="margin-top:14px"><b>Personalization:</b> the Course, Internship, Hackathon and Company Offers hubs read this skill list and match it against tagged resources.</div></div>`;
+  const streak = getDSAStreak();
+  const totalSolved = Object.values(state.practiceLog || {}).reduce((a, b) => a + b, 0);
+  const heatmapHtml = renderActivityHeatmap();
+  return `<div class="card"><div class="profile-head"><div class="avatar">${esc(initials())}</div><div><span class="kicker">PROFILE INTELLIGENCE</span><h3 style="font:800 31px Fraunces">${esc(state.name || "Student")}</h3><div style="display:flex;gap:12px;margin-top:6px"><span style="font:700 10px 'Space Mono';color:var(--soft)">${totalSolved} Problems Solved</span><span style="font:700 10px 'Space Mono';color:var(--accent)">${streak} Day Streak 🔥</span></div></div></div>
+  <div style="margin:16px 0">${heatmapHtml}</div>
+  <div class="grid2"><div><label class="source">Name</label><input id="pName" class="field" style="width:100%" value="${esc(state.name)}"></div><div><label class="source">Email</label><input id="pEmail" class="field" style="width:100%" value="${esc(state.email)}"></div><div><label class="source">Field / degree</label><input id="pField" class="field" style="width:100%" value="${esc(state.field)}"></div><div><label class="source">Goal</label><select id="pGoal" class="field" style="width:100%">${["Explore", "Internship", "Placement", "Research", "Startup"].map((x) => `<option ${state.goal === x ? "selected" : ""}>${x}</option>`).join("")}</select></div></div><div style="height:10px"></div><label class="source">Interests</label><textarea id="pInterests" class="field" rows="3" style="width:100%" placeholder="AI, medicine, finance, climate…">${esc(state.interests)}</textarea><div style="height:10px"></div><label class="source">Skills — comma separated (recognized skills only)</label><input id="pSkills" class="field" style="width:100%" value="${esc(state.skills.join(", "))}" placeholder="Python, SQL, Figma, communication"><div class="source" style="margin-top:6px">Unsupported skill names are rejected rather than used to create a match.</div><div style="height:14px"></div><button class="btn primary" onclick="saveProfileFields()">Save profile</button><div class="live-note" style="margin-top:14px"><b>Personalization:</b> the Course, Internship, Hackathon and Company Offers hubs read this skill list and match it against tagged resources.</div></div>`;
 }
-function settingsPanel() {
-  return `<div class="card"><span class="kicker">SETTINGS / THEME STUDIO</span><h3 style="font:800 31px Fraunces">Make it yours.</h3><div class="controls" style="margin:16px 0">${themeButtons()}</div><div class="grid2"><button class="btn" onclick="toggleFocus()">Focus mode</button><button class="btn" onclick="exportProfile()">Export JSON</button><button class="btn" onclick="openFeature('sources','Source Panel')">Open source panel</button><button class="btn" onclick="resetLocal()">Reset local workspace</button></div><div class="notice" style="margin-top:15px">Local-first mode: profile/workspace data is stored in this browser using localStorage. No account backend is required for this version.</div></div>`;
-}
-function marketView() {
-  const top = [...careers].sort((a, b) => b.growth - a.growth).slice(0, 5);
-  return `<div class="sectionhead"><span class="kicker">MARKET RADAR</span><h3>Current, source-labelled context.</h3><p>U.S. BLS figures below use May 2025 median wage data and 2025–35 employment projections. They are U.S. benchmarks, not Indian salary forecasts.</p></div>
+  function settingsPanel() {
+    return `<div class="card"><span class="kicker">SETTINGS / THEME STUDIO</span><h3 style="font:800 31px Fraunces">Make it yours.</h3><div class="controls" style="margin:16px 0">${themeButtons()}</div><div class="grid2"><button class="btn" onclick="toggleFocus()">Focus mode</button><button class="btn" onclick="exportProfile()">Export JSON</button><button class="btn" onclick="openFeature('sources','Source Panel')">Open source panel</button><button class="btn" onclick="resetLocal()">Reset local workspace</button></div><div class="notice" style="margin-top:15px">Local-first mode: profile/workspace data is stored in this browser using localStorage. No account backend is required for this version.</div></div>`;
+  }
+  function marketView() {
+    const top = [...careers].sort((a, b) => b.growth - a.growth).slice(0, 5);
+    return `<div class="sectionhead"><span class="kicker">MARKET RADAR</span><h3>Current, source-labelled context.</h3><p>U.S. BLS figures below use May 2025 median wage data and 2025–35 employment projections. They are U.S. benchmarks, not Indian salary forecasts.</p></div>
  <div class="bento"><div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><span class="kicker">GROWTH SIGNAL</span><h3 style="font:800 26px Fraunces">Selected occupation growth</h3></div><span class="badge">BLS 2025–35</span></div><canvas class="chart" id="marketChart"></canvas></div>
  <div class="card"><span class="kicker">SKILLS CONTEXT</span><h3 style="font:800 26px Fraunces;margin:6px 0">Skills rising in the 2025–2030 outlook</h3><div class="tags">${["AI and big data", "Networks and cybersecurity", "Technology literacy", "Creative thinking", "Resilience, flexibility and agility", "Curiosity and lifelong learning"].map((s) => `<span class="tag">${s}</span>`).join("")}</div><p style="font-size:12px;color:var(--muted);margin-top:11px">Source: World Economic Forum, Future of Jobs Report 2025.</p><button class="btn" style="margin-top:14px" onclick="window.open('${SOURCES.wef}','_blank')">Open WEF report ↗</button></div></div>
  <div style="height:16px"></div><div class="career-grid">${top
-   .map(
-     (c) =>
-       `<div class="card career"><span class="score">${c.growth}% projected growth</span><h4>${esc(c.title)}</h4><p>${esc(c.pay)}</p><div class="tags">${c.skills
-         .slice(0, 4)
-         .map((s) => `<span class="tag">${esc(s)}</span>`)
-         .join(
-           "",
-         )}</div><div class="source">${esc(c.source)} • <a href="${c.url}" target="_blank" rel="noopener">official source</a></div><div style="margin-top:11px"><button class="mini" onclick="googleCareer('${c.id}')">Google research ↗</button></div></div>`,
-   )
-   .join("")}</div>`;
-}
-function drawChart() {
-  const c = document.getElementById("marketChart");
-  if (!c) return;
-  const ctx = c.getContext("2d");
-  const r = c.getBoundingClientRect();
-  const d = window.devicePixelRatio || 1;
-  c.width = r.width * d;
-  c.height = r.height * d;
-  ctx.scale(d, d);
-  const w = r.width,
-    h = r.height;
-  ctx.clearRect(0, 0, w, h);
-  const vals = careers.map((x) => x.growth);
-  const max = Math.max(...vals, 40);
-  const pad = 35;
-  ctx.strokeStyle = "rgba(80,60,45,.14)";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    let y = pad + ((h - pad * 1.6) * i) / 4;
-    ctx.beginPath();
-    ctx.moveTo(pad, y);
-    ctx.lineTo(w - 20, y);
-    ctx.stroke();
+        .map(
+          (c) =>
+            `<div class="card career"><span class="score">${c.growth}% projected growth</span><h4>${esc(c.title)}</h4><p>${esc(c.pay)}</p><div class="tags">${c.skills
+              .slice(0, 4)
+              .map((s) => `<span class="tag">${esc(s)}</span>`)
+              .join(
+                "",
+              )}</div><div class="source">${esc(c.source)} • <a href="${c.url}" target="_blank" rel="noopener">official source</a></div><div style="margin-top:11px"><button class="mini" onclick="googleCareer('${c.id}')">Google research ↗</button></div></div>`,
+        )
+        .join("")}</div>`;
   }
-  const bw = ((w - pad - 30) / vals.length) * 0.62;
-  vals.forEach((v, i) => {
-    const x = pad + i * ((w - pad - 30) / vals.length) + 12;
-    const bh = (h - pad * 1.6) * (v / max);
-    const y = h - pad - bh;
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(
-      "--accent",
-    );
-    ctx.fillRect(x, y, bw, bh);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(
-      "--muted",
-    );
-    ctx.font = "10px DM Sans";
-    ctx.fillText(v + "%", x, y - 7);
-    ctx.font = "9px DM Sans";
-    ctx.fillText(careers[i].title.split(" ").slice(0, 2).join(" "), x, h - 12);
-  });
-}
-function sourcesView() {
-  return `<div class="sectionhead"><span class="kicker">SOURCE PANEL</span><h3>Know where the number came from.</h3><p>Horizon separates source-backed facts from profile-generated signals and makes geography explicit.</p></div>
+  function drawChart() {
+    const c = document.getElementById("marketChart");
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    const r = c.getBoundingClientRect();
+    const d = window.devicePixelRatio || 1;
+    c.width = r.width * d;
+    c.height = r.height * d;
+    ctx.scale(d, d);
+    const w = r.width,
+      h = r.height;
+    ctx.clearRect(0, 0, w, h);
+    const vals = careers.map((x) => x.growth);
+    const max = Math.max(...vals, 40);
+    const pad = 35;
+    ctx.strokeStyle = "rgba(80,60,45,.14)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      let y = pad + ((h - pad * 1.6) * i) / 4;
+      ctx.beginPath();
+      ctx.moveTo(pad, y);
+      ctx.lineTo(w - 20, y);
+      ctx.stroke();
+    }
+    const bw = ((w - pad - 30) / vals.length) * 0.62;
+    vals.forEach((v, i) => {
+      const x = pad + i * ((w - pad - 30) / vals.length) + 12;
+      const bh = (h - pad * 1.6) * (v / max);
+      const y = h - pad - bh;
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(
+        "--accent",
+      );
+      ctx.fillRect(x, y, bw, bh);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(
+        "--muted",
+      );
+      ctx.font = "10px DM Sans";
+      ctx.fillText(v + "%", x, y - 7);
+      ctx.font = "9px DM Sans";
+      ctx.fillText(careers[i].title.split(" ").slice(0, 2).join(" "), x, h - 12);
+    });
+  }
+  function sourcesView() {
+    return `<div class="sectionhead"><span class="kicker">SOURCE PANEL</span><h3>Know where the number came from.</h3><p>Horizon separates source-backed facts from profile-generated signals and makes geography explicit.</p></div>
  <div class="grid2"><div class="card"><span class="kicker">U.S. BUREAU OF LABOR STATISTICS</span><h3 style="font:800 26px Fraunces;margin:6px 0">Occupational Outlook Handbook</h3><p style="color:var(--muted);font-size:13px">BLS occupational profiles describe duties, work environment, education/training, median pay and job outlook. Horizon uses those public profiles for the U.S. benchmark cards.</p><div class="tags"><span class="tag">Software developers</span><span class="tag">Data scientists</span><span class="tag">Information security analysts</span><span class="tag">Computer systems analysts</span></div><button class="btn" onclick="window.open('${SOURCES.blsIT}','_blank')">Open BLS IT occupations ↗</button></div>
  <div class="card"><span class="kicker">WORLD ECONOMIC FORUM</span><h3 style="font:800 26px Fraunces;margin:6px 0">Future of Jobs Report 2025</h3><p style="color:var(--muted);font-size:13px">WEF reports employer expectations across 55 economies and 22 industry clusters, with skills outlook through 2030.</p><div class="tags"><span class="tag">AI & big data</span><span class="tag">Cybersecurity</span><span class="tag">Technology literacy</span><span class="tag">Creative thinking</span></div><button class="btn" onclick="window.open('${SOURCES.wef}','_blank')">Open WEF report ↗</button></div></div>
  <div style="height:16px"></div><div class="grid2">
  <div class="card"><span class="kicker">O*NET ONETLINE</span><h3 style="font:800 26px Fraunces;margin:6px 0">Occupational skill detail</h3><p style="color:var(--muted);font-size:13px">O*NET adds occupational tasks, essential skills, transferable skills and employer-based technology-skill signals. Horizon uses this layer to keep its pathway skill lists grounded rather than arbitrary.</p><div class="tags"><span class="tag">Software skills</span><span class="tag">Essential skills</span><span class="tag">Transferable skills</span><span class="tag">Employer signals</span></div><button class="btn" onclick="window.open('https://www.onetonline.org/','_blank')">Open O*NET ↗</button></div>
  <div class="card"><span class="kicker">OPPORTUNITY SOURCES</span><h3 style="font:800 26px Fraunces;margin:6px 0">Live portals, not fake records</h3><p style="color:var(--muted);font-size:13px">Company and internship pages link directly to employer or established opportunity platforms. Listings can disappear after publication, so Horizon avoids storing invented offer IDs.</p><div class="tags"><span class="tag">Google Careers</span><span class="tag">Microsoft Careers</span><span class="tag">Amazon Jobs</span><span class="tag">IBM Careers</span><span class="tag">Unstop</span><span class="tag">Hack2Skill</span></div></div></div>
  <div style="height:16px"></div><div class="card"><span class="kicker">INDIA RESEARCH ENTRY POINT</span><h3 style="font:800 26px Fraunces;margin:6px 0">National Career Service</h3><p style="color:var(--muted);font-size:13px">For Indian career and employment resources, use the official National Career Service portal. The single-file Horizon build does not claim a live NCS API integration.</p><button class="btn" onclick="window.open('${SOURCES.ncs}','_blank')">Open NCS ↗</button></div>`;
-}
+  }
 
-function openProfile() {
-  openModal(`<div class="modalhead"><div><span class="kicker">ONBOARDING / PROFILE</span><h3 style="font:800 30px Fraunces">Tell Horizon what matters.</h3></div><button class="close" onclick="closeModal()">✕</button></div>
+
+  /* ============================================================
+     CONTESTS & ARENA MODULE (HORIZON VERIFIED CONTESTS & SAFEGUARD)
+     ============================================================ */
+
+  const contestList = [
+    {
+      id: "lc-weekly-442",
+      title: "LeetCode Weekly Contest 442",
+      platform: "LeetCode",
+      category: "competitive",
+      date: "2026-10-11",
+      startTime: "08:00 AM IST",
+      duration: "90 Mins",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-11T08:00:00+05:30").getTime(),
+      registrationLink: "https://leetcode.com/contest/",
+      difficulty: "Medium / Hard",
+      syllabus: ["Dynamic Programming", "Graph Traversal", "Binary Search", "Monotonic Stack"],
+      description: "Official weekly competitive programming contest for global student ranking and rating recalibration.",
+      prizes: "Top 50 receive LeetCode badges, coins & direct interview referral fast-track."
+    },
+    {
+      id: "lc-biweekly-154",
+      title: "LeetCode Biweekly Contest 154",
+      platform: "LeetCode",
+      category: "competitive",
+      date: "2026-10-17",
+      startTime: "08:00 PM IST",
+      duration: "90 Mins",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-17T20:00:00+05:30").getTime(),
+      registrationLink: "https://leetcode.com/contest/",
+      difficulty: "Medium",
+      syllabus: ["Sliding Window", "Binary Trees", "Hash Tables", "Greedy Strategies"],
+      description: "Biweekly weekend algorithmic battle rated for all users. Tests pattern recognition and implementation speed.",
+      prizes: "Global rating boost and verified skill verification credentials."
+    },
+    {
+      id: "cf-round-999-div2",
+      title: "Codeforces Round 999 (Div. 2)",
+      platform: "Codeforces",
+      category: "competitive",
+      date: "2026-10-06",
+      startTime: "08:05 PM IST",
+      duration: "120 Mins",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-06T20:05:00+05:30").getTime(),
+      registrationLink: "https://codeforces.com/contests",
+      difficulty: "Div 2 (< 2100 rating)",
+      syllabus: ["Constructive Math", "Number Theory", "Trees & Euler Tour", "Dynamic Programming"],
+      description: "Challenging Div. 2 contest with algorithmic puzzles curated by international Grandmasters.",
+      prizes: "Official Codeforces rating adjustment for Division 2 participants worldwide."
+    },
+    {
+      id: "cf-round-1000-div3",
+      title: "Codeforces Round 1000 (Div. 3 — Milestone Edition)",
+      platform: "Codeforces",
+      category: "competitive",
+      date: "2026-10-04",
+      startTime: "07:35 PM IST",
+      duration: "135 Mins",
+      status: "Live",
+      targetEpoch: new Date("2026-10-04T19:35:00+05:30").getTime(),
+      registrationLink: "https://codeforces.com/contests",
+      difficulty: "Div 3 (All Skill Levels)",
+      syllabus: ["Implementation", "Greedy", "Binary Search", "Two Pointers", "Combinatorics"],
+      description: "Special celebratory 1000th Div. 3 round. Ideal for college students calibrating competitive speed.",
+      prizes: "Milestone contest badge and rating adjustment."
+    },
+    {
+      id: "sih-2026-senior",
+      title: "Smart India Hackathon (SIH) 2026 — Senior Edition",
+      platform: "Smart India Hackathon",
+      category: "hackathons",
+      date: "2026-10-24",
+      startTime: "09:00 AM IST",
+      duration: "36 Hours",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-24T09:00:00+05:30").getTime(),
+      registrationLink: "https://sih.gov.in/",
+      difficulty: "National Level (Team of 6)",
+      syllabus: ["Full-Stack Architecture", "AI & Computer Vision", "GovTech Cloud APIs", "Mobile Systems"],
+      description: "The world's largest open-innovation student hackathon tackling real problem statements from Indian ministries.",
+      prizes: "₹1,00,000 per problem statement + direct pre-placement interview (PPI) opportunities."
+    },
+    {
+      id: "mlh-ghw-opensource-2026",
+      title: "MLH Global Hack Week: Open Source",
+      platform: "Major League Hacking (MLH)",
+      category: "hackathons",
+      date: "2026-10-16",
+      startTime: "05:30 PM IST",
+      duration: "7 Days Sprint",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-16T17:30:00+05:30").getTime(),
+      registrationLink: "https://mlh.io/seasons/2026/events",
+      difficulty: "Beginner to Advanced",
+      syllabus: ["Git Workflows & PRs", "Documentation", "CI/CD Automations", "Package Publishing"],
+      description: "Week-long international hackathon focused on contributing production code to open-source software repositories.",
+      prizes: "Digital credentials, MLH swag packages, and sponsor tech mentorship."
+    },
+    {
+      id: "college-placement-oa-tier1",
+      title: "Campus Internal Placement Qualifier: DSA & System Design",
+      platform: "College Placement Cell",
+      category: "college",
+      date: "2026-10-08",
+      startTime: "10:00 AM IST",
+      duration: "120 Mins",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-08T10:00:00+05:30").getTime(),
+      registrationLink: "#arena",
+      difficulty: "Campus Placement OA (Tier-1 SDE)",
+      syllabus: ["Trie & Strings", "Graph Shortest Path", "Low-Level Design (LLD)", "SQL Query Optimization"],
+      description: "Official internal campus benchmark OA used to shortlist candidates for upcoming tier-1 product campus drives.",
+      prizes: "Placement cell interview slot priority + verified college internal score."
+    },
+    {
+      id: "horizon-intercollegiate-speedrun",
+      title: "HORIZON Inter-College Algorithmic SpeedRun 2026",
+      platform: "College Internal Coding Rounds",
+      category: "college",
+      date: "2026-10-12",
+      startTime: "06:00 PM IST",
+      duration: "90 Mins",
+      status: "Upcoming",
+      targetEpoch: new Date("2026-10-12T18:00:00+05:30").getTime(),
+      registrationLink: "#arena",
+      difficulty: "Inter-College Invitational",
+      syllabus: ["Bit Manipulation", "Disjoint Set Union (DSU)", "Dynamic Programming on Trees", "Range Queries"],
+      description: "Multi-campus collegiate championship pitting top engineering colleges in high-speed algorithmic problem solving.",
+      prizes: "Campus Champions Trophy, consistency leaderboard boost, and certificate of distinction."
+    },
+    {
+      id: "cf-educational-175",
+      title: "Codeforces Educational Round 175 (Div. 2)",
+      platform: "Codeforces",
+      category: "competitive",
+      date: "2026-09-28",
+      startTime: "08:05 PM IST",
+      duration: "120 Mins",
+      status: "Past",
+      targetEpoch: new Date("2026-09-28T20:05:00+05:30").getTime(),
+      registrationLink: "https://codeforces.com/contests",
+      difficulty: "Div 2 Educational",
+      syllabus: ["Prefix Sums", "Segment Trees", "Game Theory", "Combinatorics"],
+      description: "Educational round focused on fundamental techniques and deep mathematical insights.",
+      prizes: "Problem archive and editorial available for post-contest upsolving."
+    }
+  ];
+
+  const defaultLeaderboard = [
+    {
+      rank: 1,
+      name: "Aarav Sharma",
+      avatar: "AS",
+      college: "IIT Delhi",
+      consistency: 99.4,
+      solved: 742,
+      rating: 2314,
+      tier: "Guardian / Master",
+      streak: 114,
+      verified: true,
+      badges: ["Top 0.1%", "Hackathon Winner", "Div 1"]
+    },
+    {
+      rank: 2,
+      name: "Ananya Iyer",
+      avatar: "AI",
+      college: "BITS Pilani",
+      consistency: 98.7,
+      solved: 688,
+      rating: 2198,
+      tier: "Master",
+      streak: 92,
+      verified: true,
+      badges: ["SIH Finalist", "Knight", "Problem Setter"]
+    },
+    {
+      rank: 3,
+      name: "Rohan Kulkarni",
+      avatar: "RK",
+      college: "DTU (Delhi Tech)",
+      consistency: 97.5,
+      solved: 635,
+      rating: 2085,
+      tier: "Candidate Master",
+      streak: 76,
+      verified: true,
+      badges: ["Speed Demon", "Graph Specialist"]
+    },
+    {
+      rank: 4,
+      name: "Sneha Mukherjee",
+      avatar: "SM",
+      college: "IIIT Hyderabad",
+      consistency: 96.9,
+      solved: 594,
+      rating: 2012,
+      tier: "Candidate Master",
+      streak: 64,
+      verified: true,
+      badges: ["Algorithm Ace", "100% Integrity"]
+    },
+    {
+      rank: 5,
+      name: "Vikramaditya Rao",
+      avatar: "VR",
+      college: "NIT Trichy",
+      consistency: 95.8,
+      solved: 560,
+      rating: 1945,
+      tier: "Knight",
+      streak: 53,
+      verified: true,
+      badges: ["Dynamic Prog Pro"]
+    },
+    {
+      rank: 6,
+      name: "Pooja Hegde",
+      avatar: "PH",
+      college: "NSUT Delhi",
+      consistency: 94.6,
+      solved: 512,
+      rating: 1890,
+      tier: "Knight",
+      streak: 47,
+      verified: true,
+      badges: ["System Design"]
+    },
+    {
+      rank: 7,
+      name: "Kabir Mehta",
+      avatar: "KM",
+      college: "VIT Vellore",
+      consistency: 93.8,
+      solved: 489,
+      rating: 1825,
+      tier: "Knight",
+      streak: 38,
+      verified: true,
+      badges: ["Consistent Coder"]
+    },
+    {
+      rank: 8,
+      name: "Devika Nair",
+      avatar: "DN",
+      college: "IIT Bombay",
+      consistency: 92.5,
+      solved: 450,
+      rating: 1795,
+      tier: "Specialist",
+      streak: 31,
+      verified: true,
+      badges: ["Open Source"]
+    }
+  ];
+
+  let arenaCategory = "all";
+  let arenaSearchQuery = "";
+  let leaderboardScope = "campus";
+  let leaderboardSortKey = "consistency";
+  let arenaCountdownInterval = null;
+  let currentAuditScenario = "peerPlagiarism";
+  let proctorViolations = {
+    tabSwitches: 0,
+    pasteInjections: 0,
+    keystrokes: 0,
+    startTime: null
+  };
+
+  function formatCountdown(targetEpoch, status) {
+    if (status === "Past") return "CONCLUDED / ARCHIVE";
+    if (status === "Live") return "● LIVE NOW";
+    const now = Date.now();
+    const diff = targetEpoch - now;
+    if (diff <= 0) return "● LIVE NOW";
+    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const m = Math.floor((diff / 1000 / 60) % 60);
+    const s = Math.floor((diff / 1000) % 60);
+    return `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  }
+
+  function updateArenaCountdowns() {
+    const elements = document.querySelectorAll(".arena-countdown");
+    const now = Date.now();
+    elements.forEach((el) => {
+      const epoch = parseInt(el.getAttribute("data-epoch"), 10);
+      const status = el.getAttribute("data-status");
+      if (status === "Past") {
+        el.textContent = "CONCLUDED / ARCHIVE";
+        return;
+      }
+      const diff = epoch - now;
+      if (diff <= 0 || status === "Live") {
+        el.innerHTML = '<span style="color:var(--green);font-weight:800">● LIVE NOW</span>';
+      } else {
+        const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const m = Math.floor((diff / 1000 / 60) % 60);
+        const s = Math.floor((diff / 1000) % 60);
+        el.textContent = `${d}d ${String(h).padStart(2, "0")}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+      }
+    });
+  }
+
+  function renderContestCards() {
+    let list = contestList.filter((c) => {
+      if (arenaCategory !== "all") {
+        if (arenaCategory === "competitive" && c.category !== "competitive") return false;
+        if (arenaCategory === "hackathons" && c.category !== "hackathons") return false;
+        if (arenaCategory === "college" && c.category !== "college") return false;
+      }
+      if (arenaSearchQuery) {
+        const haystack = (c.title + " " + c.platform + " " + c.difficulty + " " + c.syllabus.join(" ")).toLowerCase();
+        if (!haystack.includes(arenaSearchQuery)) return false;
+      }
+      return true;
+    });
+
+    if (!list.length) {
+      return `<div class="empty" style="grid-column:1/-1">No contests found matching this category or filter. Try switching tabs.</div>`;
+    }
+
+    const userContests = state.contests || [];
+
+    return list
+      .map((c) => {
+        const isRegistered = userContests.includes(c.id);
+        const platformClass =
+          c.platform.toLowerCase().includes("leetcode")
+            ? "leetcode"
+            : c.platform.toLowerCase().includes("codeforces")
+              ? "codeforces"
+              : c.category === "hackathons"
+                ? "hackathons"
+                : "college";
+
+        const statusClass = c.status === "Live" ? "live" : c.status === "Past" ? "past" : "upcoming";
+
+        return `
+      <div class="contest-card ${c.status === "Live" ? "is-live" : ""}">
+        <div class="contest-top">
+          <span class="platform-pill ${platformClass}">
+            ${esc(c.platform)}
+          </span>
+          <span class="status-pill ${statusClass}">
+            ${c.status === "Live" ? "● " : ""}${esc(c.status)}
+          </span>
+        </div>
+
+        <h4>${esc(c.title)}</h4>
+        <div style="font:700 10px 'Space Mono';color:var(--accent);margin-bottom:8px">DIFFICULTY: ${esc(c.difficulty)}</div>
+
+        <div class="contest-timing">
+          <span>📅 ${esc(c.date)}</span>
+          <span>⏱ ${esc(c.startTime)} (${esc(c.duration)})</span>
+        </div>
+
+        <div class="contest-countdown-wrap">
+          <span class="label">Time Remaining</span>
+          <span class="digits arena-countdown" data-epoch="${c.targetEpoch}" data-status="${c.status}">${formatCountdown(c.targetEpoch, c.status)}</span>
+        </div>
+
+        <div class="contest-syllabus">
+          <span class="contest-syllabus-label">Topics Tested / Syllabus</span>
+          <div class="tags">
+            ${c.syllabus.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}
+          </div>
+        </div>
+
+        <div class="contest-actions">
+          <a href="${c.registrationLink}" target="_blank" rel="noopener" class="btn" style="text-align:center;font-size:11px;font-weight:700">
+            Official Registration ↗
+          </a>
+          <button class="btn-reminder ${isRegistered ? "active" : ""}" onclick="toggleContestReminder('${c.id}')">
+            ${isRegistered ? "✓ In Weekly Planner (Scheduled)" : "🔔 Set Reminder / Add to Weekly Planner"}
+          </button>
+        </div>
+      </div>
+      `;
+      })
+      .join("");
+  }
+
+  function setArenaFilter(category) {
+    arenaCategory = category;
+    const grid = document.getElementById("arenaCardsGrid");
+    if (grid) grid.innerHTML = renderContestCards();
+    document.querySelectorAll(".arena-filter-tabs .arena-tab-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.textContent.toLowerCase().includes(category === "all" ? "all" : category === "competitive" ? "competitive" : category));
+    });
+  }
+
+  function arenaSearch(val) {
+    arenaSearchQuery = (val || "").toLowerCase().trim();
+    const grid = document.getElementById("arenaCardsGrid");
+    if (grid) grid.innerHTML = renderContestCards();
+  }
+
+  function toggleContestReminder(contestId) {
+    const contest = contestList.find((x) => x.id === contestId);
+    if (!contest) return;
+
+    state.contests = state.contests || [];
+    const idx = state.contests.indexOf(contestId);
+    const taskTitle = `Contest: ${contest.title} (${contest.platform} · ${contest.date} ${contest.startTime})`;
+
+    if (idx > -1) {
+      state.contests.splice(idx, 1);
+      state.tasks = (state.tasks || []).filter((t) => t.title !== taskTitle);
+      save();
+      toast(`Removed ${contest.title} from Weekly Planner`);
+    } else {
+      state.contests.push(contestId);
+      state.tasks = state.tasks || [];
+      if (!state.tasks.some((t) => t.title === taskTitle)) {
+        state.tasks.push({ title: taskTitle, done: false });
+      }
+      save();
+      toast(`✓ Scheduled! Added ${contest.title} to your Weekly Planner & Reminders`);
+    }
+
+    const grid = document.getElementById("arenaCardsGrid");
+    if (grid) grid.innerHTML = renderContestCards();
+
+    const lBody = document.getElementById("leaderboardBody");
+    if (lBody) lBody.innerHTML = renderLeaderboardRows();
+  }
+
+  function renderLeaderboardRows() {
+    const userContests = state.contests || [];
+    const userTasks = state.tasks || [];
+    const completedTasks = userTasks.filter((t) => t.done).length;
+    const userSkills = state.skills || [];
+
+    const userConsistency = Math.min(
+      99.2,
+      88.0 + completedTasks * 1.8 + userContests.length * 1.5 + userSkills.length * 0.4
+    ).toFixed(1);
+
+    const userSolved = 380 + completedTasks * 22 + userContests.length * 18 + userSkills.length * 8;
+    const userRating = 1820 + userContests.length * 40 + userSkills.length * 10;
+    const userStreak = Math.max(14, 14 + userContests.length * 6);
+
+    const currentUserEntry = {
+      rank: 0,
+      name: (state.name || "Student") + " (You)",
+      avatar: initials(),
+      college: state.field || "Your College Campus",
+      consistency: parseFloat(userConsistency),
+      solved: userSolved,
+      rating: userRating,
+      tier: userRating >= 2100 ? "Master" : userRating >= 1900 ? "Candidate Master" : "Knight",
+      streak: userStreak,
+      verified: true,
+      badges: ["Campus Contender", "Active Workspace"],
+      isMe: true
+    };
+
+    let rows = [...defaultLeaderboard];
+
+    if (leaderboardScope === "campus") {
+      rows = rows.filter((r, i) => i < 5 || r.college.includes("Delhi") || r.college.includes("DTU") || r.college.includes("IIT"));
+    }
+
+    rows.push(currentUserEntry);
+
+    if (leaderboardSortKey === "consistency") {
+      rows.sort((a, b) => b.consistency - a.consistency);
+    } else if (leaderboardSortKey === "solved") {
+      rows.sort((a, b) => b.solved - a.solved);
+    } else if (leaderboardSortKey === "rating") {
+      rows.sort((a, b) => b.rating - a.rating);
+    }
+
+    return rows
+      .map((r, i) => {
+        const rankNum = i + 1;
+        const rankIcon =
+          rankNum === 1
+            ? "🥇"
+            : rankNum === 2
+              ? "🥈"
+              : rankNum === 3
+                ? "🥉"
+                : `#${rankNum}`;
+        const rankClass = rankNum <= 3 ? `top-${rankNum}` : "";
+
+        return `
+      <tr class="leaderboard-row ${r.isMe ? "is-me" : ""}">
+        <td>
+          <span class="rank-badge ${rankClass}">${rankIcon}</span>
+        </td>
+        <td>
+          <div class="student-col">
+            <div class="student-avatar" style="${r.isMe ? "background:var(--accent);color:#fff;border-color:var(--accent)" : ""}">${esc(r.avatar)}</div>
+            <div class="student-meta">
+              <strong>${esc(r.name)} ${r.isMe ? '<span style="font-size:9px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:999px;margin-left:4px">YOU</span>' : ""}</strong>
+              <span>${esc(r.college)}</span>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span class="streak-pill">🔥 ${esc(r.streak)}d</span>
+        </td>
+        <td>
+          <div class="consistency-bar-wrap">
+            <span class="consistency-val">${r.consistency}%</span>
+            <div class="progress" style="height:6px"><i style="width:${r.consistency}%"></i></div>
+          </div>
+        </td>
+        <td>
+          <b style="font:800 15px Fraunces;color:var(--ink)">${r.solved}</b>
+          <span style="font-size:10px;color:var(--muted)"> problems</span>
+        </td>
+        <td>
+          <b style="font:800 15px Fraunces;color:var(--accent)">${r.rating}</b>
+          <div style="font:700 9px 'Space Mono';color:var(--soft)">${esc(r.tier)}</div>
+        </td>
+        <td>
+          <div class="tags" style="gap:4px">
+            ${(r.badges || []).map((b) => `<span class="tag" style="font-size:10px">${esc(b)}</span>`).join("")}
+          </div>
+        </td>
+      </tr>
+      `;
+      })
+      .join("");
+  }
+
+  function sortLeaderboard(key) {
+    leaderboardSortKey = key;
+    const body = document.getElementById("leaderboardBody");
+    if (body) body.innerHTML = renderLeaderboardRows();
+  }
+
+  function setLeaderboardScope(scope) {
+    leaderboardScope = scope;
+    const body = document.getElementById("leaderboardBody");
+    if (body) body.innerHTML = renderLeaderboardRows();
+    document.querySelectorAll(".leaderboard-scope-toggle .arena-tab-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.textContent.toLowerCase().includes(scope));
+    });
+  }
+
+  function renderAuditReportContent(scenario) {
+    if (scenario === "authenticCode") {
+      return `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <span class="audit-verdict-tag clean">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          AUTHENTIC SUBMISSION: 100% VERIFIED BY AST &amp; TELEMETRY
+        </span>
+        <span style="font:700 10px 'Space Mono';color:var(--soft)">AUDIT ID: HAIP-2026-AUTH-9182 · PASSED</span>
+      </div>
+
+      <div class="similarity-breakdown-grid">
+        <div class="similarity-meter-card">
+          <span class="label">Overall Plagiarism Index</span>
+          <div class="val clean">14.2%</div>
+          <span style="font-size:11px;color:var(--green);font-weight:700">✓ Natural Baseline</span>
+        </div>
+        <div class="similarity-meter-card">
+          <span class="label">AST Structural Similarity</span>
+          <div class="val clean">16.8%</div>
+          <span style="font-size:11px;color:var(--muted)">Unique Control Flow</span>
+        </div>
+        <div class="similarity-meter-card">
+          <span class="label">Keystroke Dynamic Anomaly</span>
+          <div class="val clean">4.1%</div>
+          <span style="font-size:11px;color:var(--green);font-weight:700">✓ Organic Typing Cadence</span>
+        </div>
+        <div class="similarity-meter-card">
+          <span class="label">Public Repo &amp; Peer Overlap</span>
+          <div class="val clean">12.0%</div>
+          <span style="font-size:11px;color:var(--muted)">No Template Markers</span>
+        </div>
+      </div>
+
+      <div class="diff-code-grid">
+        <div class="diff-pane">
+          <div class="diff-pane-title">
+            <span>Student Submission #104 (Kadane Max Subarray)</span>
+            <span style="color:#85e89d">VERIFIED AUTHENTIC</span>
+          </div>
+def findMaxSubarray(arr):
+    # handling empty or single element
+    if not arr: return 0
+    ans = -99999999
+    cur = 0
+    for x in arr:
+        cur += x
+        if cur > ans:
+            ans = cur
+        if cur < 0:
+            cur = 0 # reset prefix if negative
+    return ans
+        </div>
+        <div class="diff-pane">
+          <div class="diff-pane-title">
+            <span>Peer Benchmark Corpus &amp; Reference Repository</span>
+            <span style="color:var(--soft)">AST FINGERPRINT COMPARATOR</span>
+          </div>
+def maxSubArray(nums):
+    max_so_far = nums[0]
+    curr_max = nums[0]
+    for i in range(1, len(nums)):
+        curr_max = max(nums[i], curr_max + nums[i])
+        max_so_far = max(max_so_far, curr_max)
+    return max_so_far
+        </div>
+      </div>
+
+      <div class="notice" style="background:rgba(46,91,72,0.1);border-color:rgba(46,91,72,0.3);color:var(--green)">
+        <b>Proctor Decision:</b> Candidate solution exhibits genuine cognitive variance, organic backspace keystroke pauses (mean IKI 165ms), and distinct control structure. Verified authentic; submission recorded with distinction badge.
+      </div>
+    `;
+    }
+
+    if (scenario === "chatgptInjection") {
+      return `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <span class="audit-verdict-tag critical">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          FLAGGED: AI / CHATGPT INSTANT CODE INJECTION DETECTED
+        </span>
+        <span style="font:700 10px 'Space Mono';color:var(--soft)">AUDIT ID: HAIP-2026-LLM-4491 · FLAGGED</span>
+      </div>
+
+      <div class="similarity-breakdown-grid">
+        <div class="similarity-meter-card">
+          <span class="label">Overall Plagiarism Index</span>
+          <div class="val critical">93.4%</div>
+          <span style="font-size:11px;color:var(--danger);font-weight:700">🚨 Severe Violation</span>
+        </div>
+        <div class="similarity-meter-card">
+          <span class="label">Keystroke Velocity Anomaly</span>
+          <div class="val critical">99.2%</div>
+          <span style="font-size:11px;color:var(--danger)">142 chars in 8ms (Paste)</span>
+        </div>
+        <div class="similarity-meter-card">
+          <span class="label">AI Stylometry &amp; Signature</span>
+          <div class="val critical">92.6%</div>
+          <span style="font-size:11px;color:var(--danger)">LLM Formatting Markers</span>
+        </div>
+        <div class="similarity-meter-card">
+          <span class="label">Semantic AST Match</span>
+          <div class="val critical">88.5%</div>
+          <span style="font-size:11px;color:var(--danger)">Identical Syntax Pattern</span>
+        </div>
+      </div>
+
+      <div class="diff-code-grid">
+        <div class="diff-pane">
+          <div class="diff-pane-title">
+            <span>Student Submission #312 (Flagged Injection)</span>
+            <span style="color:#ff7b72">INSTANT INJECTION (0ms typing)</span>
+          </div>
+<mark># Optimal implementation with O(N) time and O(N) auxiliary space</mark>
+<mark># Uses Kadane's algorithm to compute the maximum subarray sum in a single pass.</mark>
+def maxSubArray(nums: list[int]) -> int:
+    <mark>current_running_sum = max_so_far = nums[0]</mark>
+    for num in nums[1:]:
+        <mark>current_running_sum = max(num, current_running_sum + num)</mark>
+        max_so_far = max(max_so_far, current_running_sum)
+    return max_so_far
+        </div>
+        <div class="diff-pane">
+          <div class="diff-pane-title">
+            <span>ChatGPT / LLM Archetype Training Signature</span>
+            <span style="color:var(--soft)">PROMPT COMPILATION TRACE</span>
+          </div>
+# Optimal implementation with O(N) time and O(N) auxiliary space
+# Uses Kadane's algorithm to compute the maximum subarray sum in a single pass.
+def maxSubArray(nums: list[int]) -> int:
+    current_running_sum = max_so_far = nums[0]
+    for num in nums[1:]:
+        current_running_sum = max(num, current_running_sum + num)
+        max_so_far = max(max_so_far, current_running_sum)
+    return max_so_far
+        </div>
+      </div>
+
+      <div class="notice" style="background:rgba(166,77,63,0.1);border-color:rgba(166,77,63,0.3);color:var(--danger)">
+        <b>Proctor Decision:</b> Keystroke velocity anomaly exceeded biological threshold (zero inter-keystroke intervals; 48 tokens injected simultaneously). Signature comments and type hints match common LLM outputs. Marked for automatic placement disqualification.
+      </div>
+    `;
+    }
+
+    // Default: scenario === "peerPlagiarism"
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <span class="audit-verdict-tag critical">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        CRITICAL INTEGRITY BREACH: PEER PLAGIARISM DETECTED (AST ISOMORPHISM)
+      </span>
+      <span style="font:700 10px 'Space Mono';color:var(--soft)">AUDIT ID: HAIP-2026-PEER-8823 · FLAGGED</span>
+    </div>
+
+    <div class="similarity-breakdown-grid">
+      <div class="similarity-meter-card">
+        <span class="label">Overall Plagiarism Index</span>
+        <div class="val critical">94.7%</div>
+        <span style="font-size:11px;color:var(--danger);font-weight:700">🚨 Severe Violation</span>
+      </div>
+      <div class="similarity-meter-card">
+        <span class="label">Semantic AST Structural Similarity</span>
+        <div class="val critical">97.8%</div>
+        <span style="font-size:11px;color:var(--danger)">Control Flow Isomorphic</span>
+      </div>
+      <div class="similarity-meter-card">
+        <span class="label">Variable Renaming Masking</span>
+        <div class="val critical">Detected</div>
+        <span style="font-size:11px;color:var(--danger)">4 Identifiers Mapped 1-to-1</span>
+      </div>
+      <div class="similarity-meter-card">
+        <span class="label">Public Repo &amp; Peer Overlap</span>
+        <div class="val critical">91.2%</div>
+        <span style="font-size:11px;color:var(--danger)">Matches Peer Submission #204</span>
+      </div>
+    </div>
+
+    <div class="diff-code-grid">
+      <div class="diff-pane">
+        <div class="diff-pane-title">
+          <span>Student Submission A (Candidate #204)</span>
+          <span style="color:#ff7b72">AST TOKEN OVERLAP: 97.8%</span>
+        </div>
+def twoSum(nums, target):
+    <mark>lookup = {}</mark>
+    for i, val in enumerate(nums):
+        <mark>diff = target - val</mark>
+        <mark>if diff in lookup:</mark>
+            return [lookup[diff], i]
+        <mark>lookup[val] = i</mark>
+    return []
+      </div>
+      <div class="diff-pane">
+        <div class="diff-pane-title">
+          <span>Student Submission B (Suspect #209 — Renamed Vars)</span>
+          <span style="color:#ff7b72">EVASION MASKING IDENTIFIED</span>
+        </div>
+def find_target_pair(element_array, required_sum):
+    <mark>cache_index_tbl = {}</mark>
+    for idx, current_elem in enumerate(element_array):
+        <mark>remaining_complement = required_sum - current_elem</mark>
+        <mark>if remaining_complement in cache_index_tbl:</mark>
+            return [cache_index_tbl[remaining_complement], idx]
+        <mark>cache_index_tbl[current_elem] = idx</mark>
+    return []
+      </div>
+    </div>
+
+    <div class="notice" style="background:rgba(166,77,63,0.1);border-color:rgba(166,77,63,0.3);color:var(--danger)">
+      <b>Proctor Decision:</b> AST node sequence analysis confirms structural identity with peer submission #204. Variable renaming (<code style="background:var(--paper3);padding:1px 4px;border-radius:4px">lookup</code> ➔ <code style="background:var(--paper3);padding:1px 4px;border-radius:4px">cache_index_tbl</code>, <code style="background:var(--paper3);padding:1px 4px;border-radius:4px">diff</code> ➔ <code style="background:var(--paper3);padding:1px 4px;border-radius:4px">remaining_complement</code>) did not alter control-flow graph. Automated plagiarism report forwarded to College Examination Ethics Committee.
+    </div>
+  `;
+  }
+
+  function runIntegrityAudit(scenario) {
+    currentAuditScenario = scenario || "peerPlagiarism";
+    const container = document.getElementById("auditReportDynamicContent");
+    if (!container) return;
+
+    container.innerHTML = `
+    <div style="text-align:center;padding:40px 20px">
+      <div style="font:800 24px Fraunces;color:var(--accent);margin-bottom:10px">Compiling Abstract Syntax Tree (AST)…</div>
+      <div style="font:700 11px 'Space Mono';color:var(--soft);margin-bottom:16px">Normalizing identifier tokens · Analyzing Keystroke Dynamics · Cross-matching 14,800+ cohort submissions…</div>
+      <div class="progress" style="max-width:320px;margin:0 auto;height:8px"><i style="width:78%"></i></div>
+    </div>
+  `;
+
+    setTimeout(() => {
+      container.innerHTML = renderAuditReportContent(currentAuditScenario);
+      toast("Integrity Audit Complete: Plagiarism analysis report updated");
+    }, 350);
+  }
+
+  function triggerProctorWarningModal(reason) {
+    const modalHtml = `
+    <div class="modalhead" style="border-bottom:2px solid var(--danger);padding-bottom:12px">
+      <div>
+        <span class="kicker" style="color:var(--danger)">⚠️ HORIZON INTEGRITY SAFEGUARD — PROCTOR WARNING</span>
+        <h3 style="font:800 28px Fraunces;color:var(--danger);margin-top:4px">Integrity Breach Detected: Window Focus Lost</h3>
+      </div>
+      <button class="close" onclick="closeModal()">✕</button>
+    </div>
+    <div style="padding:15px 0">
+      <div class="notice" style="background:rgba(166,77,63,0.12);border-color:rgba(166,77,63,0.3);color:var(--danger);font-weight:700">
+        Violation #${proctorViolations.tabSwitches}: ${esc(reason || "Browser window lost active focus or tab switched away.")}
+      </div>
+      <p style="margin:14px 0;font-size:13px;color:var(--muted);line-height:1.6">
+        Under University Assessment Regulations &amp; Hackathon Code of Conduct, candidate test environments are strictly monitored. 
+        All tab-switches, clipboard events, and window minimizes are timestamped and logged directly to the college placement committee.
+      </p>
+      <div class="grid2" style="margin:16px 0">
+        <div class="metric"><span>Time of Incident</span><b style="font-size:16px">${new Date().toLocaleTimeString()}</b></div>
+        <div class="metric"><span>Cumulative Violations</span><b style="font-size:16px;color:var(--danger)">${proctorViolations.tabSwitches} / 3 Allowed</b></div>
+      </div>
+      <button class="btn primary" style="width:100%;background:var(--danger)!important" onclick="closeModal()">I Acknowledge &amp; Return to Assessment</button>
+    </div>
+  `;
+    openModal(modalHtml);
+  }
+
+  function simulateTabSwitchDemo() {
+    proctorViolations.tabSwitches++;
+    const tabCountEl = document.getElementById("proctorTabCount");
+    if (tabCountEl) tabCountEl.textContent = proctorViolations.tabSwitches;
+    triggerProctorWarningModal("Simulated Window Focus Loss (Tab Switch)");
+  }
+
+  function resetProctorSandbox() {
+    proctorViolations = {
+      tabSwitches: 0,
+      pasteInjections: 0,
+      keystrokes: 0,
+      startTime: null
+    };
+    const tEl = document.getElementById("proctorTabCount");
+    const pEl = document.getElementById("proctorPasteCount");
+    const wEl = document.getElementById("proctorWpm");
+    const inputEl = document.getElementById("proctorInput");
+    const alertEl = document.getElementById("proctorAlertBox");
+
+    if (tEl) tEl.textContent = "0";
+    if (pEl) pEl.textContent = "0";
+    if (wEl) wEl.textContent = "0 WPM";
+    if (inputEl) inputEl.value = "";
+    if (alertEl) {
+      alertEl.textContent = "";
+      alertEl.classList.remove("show");
+    }
+    toast("Proctor test chamber reset to baseline");
+  }
+
+  function initProctorSandbox() {
+    const input = document.getElementById("proctorInput");
+    const alertBox = document.getElementById("proctorAlertBox");
+    if (!input) return;
+
+    input.addEventListener("paste", (e) => {
+      proctorViolations.pasteInjections++;
+      const pEl = document.getElementById("proctorPasteCount");
+      if (pEl) pEl.textContent = proctorViolations.pasteInjections;
+
+      const pastedData = (e.clipboardData || window.clipboardData)?.getData("text") || "";
+      if (alertBox) {
+        alertBox.textContent = `🚨 AI Paste Interceptor Triggered: Code block of ${pastedData.length} characters inserted in <8ms! Flagged as external copy-paste injection.`;
+        alertBox.classList.add("show");
+      }
+      toast("🚨 Paste injection flagged by AI Anti-Cheating Safeguard!");
+    });
+
+    input.addEventListener("keydown", () => {
+      if (!proctorViolations.startTime) proctorViolations.startTime = Date.now();
+      proctorViolations.keystrokes++;
+      const elapsedMinutes = (Date.now() - proctorViolations.startTime) / 60000;
+      if (elapsedMinutes > 0.05) {
+        const words = (input.value.length || 1) / 5;
+        const wpm = Math.min(180, Math.round(words / elapsedMinutes));
+        const wEl = document.getElementById("proctorWpm");
+        if (wEl) wEl.textContent = `${wpm} WPM`;
+      }
+    });
+  }
+
+  function initArenaView() {
+    clearInterval(arenaCountdownInterval);
+    arenaCountdownInterval = setInterval(updateArenaCountdowns, 1000);
+    initProctorSandbox();
+  }
+
+  function arenaView() {
+    const userContests = state.contests || [];
+    const scheduledCount = userContests.length;
+    const verifiedCount = contestList.length;
+
+    return `
+  <div class="arena-hero">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+      <div>
+        <span class="kicker">CONTESTS &amp; ARENA / STUDENT COMPETITIVE RADAR</span>
+        <h2 style="font:800 44px/1.05 Fraunces;letter-spacing:-0.03em;margin:10px 0 12px">
+          Benchmark your skill.<br><em>Prove your consistency.</em>
+        </h2>
+        <p style="color:var(--muted);max-width:720px;font-size:14px">
+          Track verified student rounds across LeetCode, Codeforces, Smart India Hackathon and campus placement qualifiers. 
+          Synchronize deadlines directly with your Weekly Planner, compete on peer leaderboards, and experience HORIZON’s AI Anti-Cheating Integrity Safeguard.
+        </p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn primary" onclick="document.getElementById('contestRadarSection')?.scrollIntoView({behavior:'smooth'})">Explore Radar ↓</button>
+        <button class="btn" onclick="document.getElementById('leaderboardSection')?.scrollIntoView({behavior:'smooth'})">Campus Leaderboard</button>
+        <button class="btn" onclick="document.getElementById('integritySection')?.scrollIntoView({behavior:'smooth'}); runIntegrityAudit('peerPlagiarism');">Run Integrity Audit ⚡</button>
+      </div>
+    </div>
+
+    <div class="arena-stats-bar">
+      <div class="arena-stat-item">
+        <span>Verified Contests Tracked</span>
+        <b>${verifiedCount} Active</b>
+      </div>
+      <div class="arena-stat-item">
+        <span>Your Scheduled Reminders</span>
+        <b>${scheduledCount} In Planner</b>
+      </div>
+      <div class="arena-stat-item">
+        <span>Active Campus Peers</span>
+        <b>840+ Ranked</b>
+      </div>
+      <div class="arena-stat-item">
+        <span>Assessment Integrity</span>
+        <b style="color:var(--green)">100% AST Guarded</b>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: CONTEST CALENDAR & RADAR -->
+  <section class="section" id="contestRadarSection">
+    <div class="sectionhead">
+      <span class="kicker">SECTION 1 / RADAR</span>
+      <h3>Contest Calendar &amp; Radar</h3>
+      <p>Filter across major competitive programming platforms, national hackathons, and college placement rounds. Countdowns update live to the second.</p>
+    </div>
+
+    <div class="arena-controls">
+      <div class="arena-filter-tabs">
+        <button class="arena-tab-btn ${arenaCategory === "all" ? "active" : ""}" onclick="setArenaFilter('all')">All Contests (${contestList.length})</button>
+        <button class="arena-tab-btn ${arenaCategory === "competitive" ? "active" : ""}" onclick="setArenaFilter('competitive')">Competitive Coding (LeetCode/Codeforces)</button>
+        <button class="arena-tab-btn ${arenaCategory === "hackathons" ? "active" : ""}" onclick="setArenaFilter('hackathons')">Hackathons</button>
+        <button class="arena-tab-btn ${arenaCategory === "college" ? "active" : ""}" onclick="setArenaFilter('college')">College Rounds</button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input id="arenaSearchInput" class="field search" style="width:260px" placeholder="Search contest, topic, or platform…" value="${esc(arenaSearchQuery)}" oninput="arenaSearch(this.value)">
+      </div>
+    </div>
+
+    <div id="arenaCardsGrid" class="contest-grid">
+      ${renderContestCards()}
+    </div>
+  </section>
+
+  <!-- SECTION 2: CAMPUS & GLOBAL LEADERBOARD -->
+  <section class="section" id="leaderboardSection">
+    <div class="sectionhead">
+      <span class="kicker">SECTION 2 / LEADERBOARD</span>
+      <h3>Campus &amp; Global Leaderboard</h3>
+      <p>Consistency is the single biggest predictor of tech placement success. Ranks peers by Consistency Score, Problems Solved, and Contest Rating.</p>
+    </div>
+
+    <div class="leaderboard-wrap">
+      <div class="leaderboard-toolbar">
+        <div class="leaderboard-scope-toggle">
+          <button class="arena-tab-btn ${leaderboardScope === "campus" ? "active" : ""}" onclick="setLeaderboardScope('campus')">🏫 Campus Rank (${esc(state.field || "Your College")})</button>
+          <button class="arena-tab-btn ${leaderboardScope === "global" ? "active" : ""}" onclick="setLeaderboardScope('global')">🌐 Global Collegiate Arena</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span style="font:700 9px 'Space Mono';color:var(--soft);text-transform:uppercase">Sort By:</span>
+          <button class="mini ${leaderboardSortKey === "consistency" ? "primary" : ""}" onclick="sortLeaderboard('consistency')">Consistency Score</button>
+          <button class="mini ${leaderboardSortKey === "solved" ? "primary" : ""}" onclick="sortLeaderboard('solved')">Problems Solved</button>
+          <button class="mini ${leaderboardSortKey === "rating" ? "primary" : ""}" onclick="sortLeaderboard('rating')">Contest Rating</button>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th style="width:70px">Rank</th>
+              <th>Student &amp; College</th>
+              <th style="width:130px">Streak</th>
+              <th style="width:180px">Consistency Score</th>
+              <th style="width:130px">Solved</th>
+              <th style="width:170px">Contest Rating</th>
+              <th>Verified Badges</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBody">
+            ${renderLeaderboardRows()}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 3: AI ANTI-CHEATING & INTEGRITY PROTOCOL (HACKATHON USP) -->
+  <section class="section" id="integritySection">
+    <div class="sectionhead">
+      <span class="kicker">SECTION 3 / HACKATHON USP</span>
+      <h3>AI Anti-Cheating &amp; Integrity Safeguard</h3>
+      <p>How HORIZON guarantees 100% authentic code during college placement qualifiers, internal assessments, and national student hackathons.</p>
+    </div>
+
+    <div class="integrity-shield-banner">
+      <div class="integrity-banner-top">
+        <div>
+          <span class="integrity-safeguard-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            HORIZON INTEGRITY ENGINE v3.4 ACTIVE
+          </span>
+          <h3>Zero-Trust Assessment Architecture</h3>
+          <p>Traditional proctoring relies on intrusive webcams. HORIZON combines client-side telemetry with deep semantic Abstract Syntax Tree (AST) analysis to catch evasion, block pastes, and ChatGPT plagiarism in milliseconds.</p>
+        </div>
+        <button class="btn primary" style="background:#ffcc66 !important;color:#211326 !important;font-weight:800;border:0" onclick="runIntegrityAudit('peerPlagiarism')">
+          ⚡ Run Code Integrity Audit Demo
+        </button>
+      </div>
+
+      <div class="integrity-grid-3">
+        <div class="integrity-feature-card">
+          <span class="num">PROTOCOL LAYER A</span>
+          <h5>Tab-Switch &amp; Focus Telemetry</h5>
+          <p>Tracks window blur, page visibility loss, and OS workspace switching with millisecond resolution. Instant modal warnings fire on violation; repeated loss locks the assessment.</p>
+        </div>
+        <div class="integrity-feature-card">
+          <span class="num">PROTOCOL LAYER B</span>
+          <h5>AI Keystroke Dynamics &amp; Paste Detection</h5>
+          <p>Flags multi-line code insertions without continuous keystroke intervals (IKIs). Distinguishes natural human typing bursts (40–120 WPM) from instant ChatGPT/external IDE copy-pastes.</p>
+        </div>
+        <div class="integrity-feature-card">
+          <span class="num">PROTOCOL LAYER C</span>
+          <h5>Semantic AST &amp; Similarity Checker</h5>
+          <p>Transforms code into normalized Abstract Syntax Trees. Defeats cosmetic evasions (renaming variables, reordering loops, whitespace reformatting) by matching underlying algorithmic logic against peer submissions and public repos.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CODE INTEGRITY AUDIT DEMO REPORT BOX -->
+    <div class="audit-report-box" id="auditReportBox">
+      <div class="audit-header">
+        <div>
+          <span class="kicker">CODE INTEGRITY AUDIT DEMO / SIMULATION</span>
+          <h4 style="font:800 24px Fraunces;margin-top:4px">Live Similarity Breakdown &amp; Plagiarism Report</h4>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="mini ${currentAuditScenario === "peerPlagiarism" ? "primary" : ""}" onclick="runIntegrityAudit('peerPlagiarism')">Scenario 1: Peer Plagiarism (Renamed Vars)</button>
+          <button class="mini ${currentAuditScenario === "chatgptInjection" ? "primary" : ""}" onclick="runIntegrityAudit('chatgptInjection')">Scenario 2: ChatGPT Code Paste</button>
+          <button class="mini ${currentAuditScenario === "authenticCode" ? "primary" : ""}" onclick="runIntegrityAudit('authenticCode')">Scenario 3: Authentic Solution (Pass)</button>
+        </div>
+      </div>
+
+      <div id="auditReportDynamicContent">
+        ${renderAuditReportContent(currentAuditScenario)}
+      </div>
+    </div>
+
+    <!-- INTERACTIVE LIVE PROCTOR SANDBOX -->
+    <div class="proctor-sandbox">
+      <div class="proctor-sandbox-head">
+        <div>
+          <span class="kicker" style="color:var(--accent)">EXPERIENCE IT LIVE / TEST CHAMBER</span>
+          <h5 style="font:800 18px Fraunces;margin-top:2px">Try Pasting Code or Switching Tabs to Trigger the Proctor</h5>
+        </div>
+        <div class="proctor-telemetry-pills">
+          <span class="telemetry-pill">Tab Switches: <b id="proctorTabCount" style="color:var(--danger)">0</b></span>
+          <span class="telemetry-pill">Paste Injections: <b id="proctorPasteCount" style="color:var(--danger)">0</b></span>
+          <span class="telemetry-pill">Typing Speed: <b id="proctorWpm" style="color:var(--green)">0 WPM</b></span>
+        </div>
+      </div>
+      <textarea id="proctorInput" class="proctor-textarea" placeholder="Paste external code here to test the AI Copy-Paste Interceptor, or switch your browser tab to trigger the Tab-Switch Warning Modal…"></textarea>
+      <div id="proctorAlertBox" class="proctor-alert-box danger"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px">
+        <span style="font-size:11px;color:var(--muted)">Telemetry active: window blur and paste events are hooked to HORIZON's local-first proctor engine.</span>
+        <div style="display:flex;gap:8px">
+          <button class="mini primary" onclick="simulateTabSwitchDemo()">Simulate Tab Switch (Trigger Modal)</button>
+          <button class="mini" onclick="resetProctorSandbox()">Reset Test Chamber</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  `;
+  }
+
+
+  function openProfile() {
+    openModal(`<div class="modalhead"><div><span class="kicker">ONBOARDING / PROFILE</span><h3 style="font:800 30px Fraunces">Tell Horizon what matters.</h3></div><button class="close" onclick="closeModal()">✕</button></div>
  <div class="grid2"><input id="mName" class="field" placeholder="Name" value="${esc(state.name)}"><input id="mEmail" class="field" placeholder="Email (optional)" value="${esc(state.email)}"><input id="mField" class="field" placeholder="Degree / field" value="${esc(state.field)}"><select id="mGoal" class="field">${["Explore", "Internship", "Placement", "Research", "Startup"].map((x) => `<option ${state.goal === x ? "selected" : ""}>${x}</option>`).join("")}</select></div>
  <div style="height:10px"></div><textarea id="mInterests" class="field" style="width:100%" rows="3" placeholder="Interests">${esc(state.interests)}</textarea><div style="height:10px"></div>
  <input id="mSkills" class="field" style="width:100%" placeholder="Skills — comma separated (e.g. Python, SQL, Git)" value="${esc(state.skills.join(", "))}"><div class="source" style="margin-top:6px">Only recognized skills enter the matching engine; unknown entries are excluded.</div><div style="height:15px"></div>
  <button class="btn primary" onclick="saveProfileModal()">Generate / update my Horizon</button>`);
-}
-function openModal(content) {
-  document.getElementById("modalContent").innerHTML = content;
-  document.getElementById("modal").classList.add("open");
-}
-function closeModal() {
-  document.getElementById("modal").classList.remove("open");
-}
-function collectProfileFrom(prefix) {
-  const parsed = parseSkillsInput(
-    document.getElementById(prefix + "Skills").value,
-  );
-  const profile = {
-    name: document.getElementById(prefix + "Name").value.trim(),
-    email: document.getElementById(prefix + "Email").value.trim(),
-    field: document.getElementById(prefix + "Field").value.trim(),
-    goal: document.getElementById(prefix + "Goal").value,
-    interests: document.getElementById(prefix + "Interests").value.trim(),
-    skills: parsed.accepted,
-  };
-  return {
-    profile,
-    rejected: parsed.rejected,
-    errors: validateProfileFields(profile),
-  };
-}
-function applyProfileInput(prefix, mode) {
-  const { profile, rejected, errors } = collectProfileFrom(prefix);
-  if (errors.length) {
-    toast(errors[0]);
-    return;
   }
-  state.name = profile.name;
-  state.email = profile.email;
-  state.field = profile.field;
-  state.goal = profile.goal;
-  state.interests = profile.interests;
-  state.skills = profile.skills;
-  syncTargetDefaults();
-  save();
-  if (mode === "home") {
-    closeModal();
-    route("home");
-  } else {
-    rerenderWorkspace("profile");
+  function openModal(content) {
+    document.getElementById("modalContent").innerHTML = content;
+    document.getElementById("modal").classList.add("open");
   }
-  toast(
-    rejected.length
-      ? "Profile updated; unsupported skills were excluded."
-      : "Profile updated — recommendations recalculated.",
-  );
-}
-function saveProfileModal() {
-  applyProfileInput("m", "home");
-}
-function saveProfileFields() {
-  applyProfileInput("p", "workspace");
-}
-function rerenderWorkspace(panel) {
-  route("workspace");
-  setTimeout(() => setPanel(panel), 0);
-}
-function openCareer(id) {
-  const c = careers.find((x) => x.id === id);
-  if (!c) return;
-  const current = profileSkillSet();
-  const gaps = (c.skills || []).filter((s) => !current.has(normalizeSkill(s)));
-  const companies = targetCompanies[c.id] || [];
-  openModal(`<div class="modalhead"><div><span class="kicker">CAREER PATHWAY</span><h3 style="font:800 32px Fraunces">${esc(c.title)}</h3></div><button class="close" onclick="closeModal()">✕</button></div>
+  function closeModal() {
+    document.getElementById("modal").classList.remove("open");
+  }
+  function collectProfileFrom(prefix) {
+    const parsed = parseSkillsInput(
+      document.getElementById(prefix + "Skills").value,
+    );
+    const profile = {
+      name: document.getElementById(prefix + "Name").value.trim(),
+      email: document.getElementById(prefix + "Email").value.trim(),
+      field: document.getElementById(prefix + "Field").value.trim(),
+      goal: document.getElementById(prefix + "Goal").value,
+      interests: document.getElementById(prefix + "Interests").value.trim(),
+      skills: parsed.accepted,
+    };
+    return {
+      profile,
+      rejected: parsed.rejected,
+      errors: validateProfileFields(profile),
+    };
+  }
+  function applyProfileInput(prefix, mode) {
+    const { profile, rejected, errors } = collectProfileFrom(prefix);
+    if (errors.length) {
+      toast(errors[0]);
+      return;
+    }
+    state.name = profile.name;
+    state.email = profile.email;
+    state.field = profile.field;
+    state.goal = profile.goal;
+    state.interests = profile.interests;
+    state.skills = profile.skills;
+    syncTargetDefaults();
+    save();
+    if (mode === "home") {
+      closeModal();
+      route("home");
+    } else {
+      rerenderWorkspace("profile");
+    }
+    toast(
+      rejected.length
+        ? "Profile updated; unsupported skills were excluded."
+        : "Profile updated — recommendations recalculated.",
+    );
+  }
+  function saveProfileModal() {
+    applyProfileInput("m", "home");
+  }
+  function saveProfileFields() {
+    applyProfileInput("p", "workspace");
+  }
+  function rerenderWorkspace(panel) {
+    route("workspace");
+    setTimeout(() => setPanel(panel), 0);
+  }
+  function openCareer(id) {
+    const c = careers.find((x) => x.id === id);
+    if (!c) return;
+    const current = profileSkillSet();
+    const gaps = (c.skills || []).filter((s) => !current.has(normalizeSkill(s)));
+    const companies = targetCompanies[c.id] || [];
+    openModal(`<div class="modalhead"><div><span class="kicker">CAREER PATHWAY</span><h3 style="font:800 32px Fraunces">${esc(c.title)}</h3></div><button class="close" onclick="closeModal()">✕</button></div>
           <p style="color:var(--muted);font-size:13px">${esc(c.desc)}</p>
           <div class="tags">${c.skills.map((s) => `<span class="tag">${current.has(normalizeSkill(s)) ? "✓ " : ""}${esc(s)}</span>`).join("")}</div>
           <div class="grid2"><div class="metric"><span>Profile-derived match</span><b>${fitFor(c)}%</b></div><div class="metric"><span>BLS projected growth</span><b>${c.growth}%</b></div></div>
@@ -5215,485 +6666,536 @@ function openCareer(id) {
           <div class="listrow"><b style="flex:1">${esc(internshipTargetFor(c))}</b><span class="badge">TARGET TITLE</span></div>
           <div style="height:8px"></div>
           ${companies
-            .map((co) => {
-              const u = targetCompanyLink(c, co);
-              return `<div class="listrow"><b style="flex:1">${esc(co)}</b><a class="resource-link" href="${u}" target="_blank" rel="noopener">Open company portal ↗</a></div>`;
-            })
-            .join("")}
+        .map((co) => {
+          const u = targetCompanyLink(c, co);
+          return `<div class="listrow"><b style="flex:1">${esc(co)}</b><a class="resource-link" href="${u}" target="_blank" rel="noopener">Open company portal ↗</a></div>`;
+        })
+        .join("")}
           <div style="height:12px"></div><div class="source">Availability and eligibility are controlled by the employer source. Horizon does not claim that these portals contain an open role for you right now.</div>`);
-}
-
-function toggleSave(id) {
-  state.saved = state.saved.includes(id)
-    ? state.saved.filter((x) => x !== id)
-    : [...state.saved, id];
-  save();
-  toast(state.saved.includes(id) ? "Career saved" : "Career removed");
-  rerenderWorkspace("saved");
-}
-function googleCareer(id) {
-  const c = careers.find((x) => x.id === id);
-  if (!c) return;
-  const q = encodeURIComponent(
-    `${c.title} career skills salary outlook official ${new Date().getFullYear()}`,
-  );
-  window.open("https://www.google.com/search?q=" + q, "_blank");
-}
-function generateCareerTask(id) {
-  const c = careers.find((x) => x.id === id);
-  state.tasks.push({
-    title: `Research ${c.title} and choose one skill to deepen`,
-    done: false,
-  });
-  save();
-  toast("Roadmap action added");
-}
-function generateRoadmap() {
-  const role = getTargetRole();
-  if (!role) {
-    toast("Add recognized skills before generating a roadmap.");
-    return;
   }
-  generateTargetRoadmap(role.id);
-}
 
-function generateGapTasks() {
-  const target = getTargetRole();
-  if (!target) {
-    toast("Add recognized skills before generating gap tasks.");
-    return;
-  }
-  const mine = profileSkillSet();
-  target.skills
-    .filter((s) => !mine.has(normalizeSkill(s)))
-    .forEach((s) => {
-      const title = `Practice ${s} and create evidence`;
-      if (!state.tasks.some((t) => t.title === title))
-        state.tasks.push({ title, done: false });
-    });
-  save();
-  toast("Gap-closing tasks added");
-  rerenderWorkspace("planner");
-}
-function toggleTask(i) {
-  if (i < 0) return;
-  if (state.tasks[i]) {
-    state.tasks[i].done = !state.tasks[i].done;
+  function toggleSave(id) {
+    state.saved = state.saved.includes(id)
+      ? state.saved.filter((x) => x !== id)
+      : [...state.saved, id];
     save();
-    rerenderWorkspace("overview");
+    toast(state.saved.includes(id) ? "Career saved" : "Career removed");
+    rerenderWorkspace("saved");
   }
-}
-function addTask() {
-  const el = document.getElementById("taskInput"),
-    v = el?.value.trim();
-  if (!v) return;
-  state.tasks.push({ title: v, done: false });
-  save();
-  toast("Task added");
-  rerenderWorkspace("planner");
-}
-function deleteTask(i) {
-  state.tasks.splice(i, 1);
-  save();
-  rerenderWorkspace("planner");
-}
-function newProject() {
-  const title = prompt("Project title");
-  if (!title) return;
-  const desc = prompt("What problem will it solve or investigate?") || "";
-  state.projects.push({
-    id: cryptoSafeId(),
-    title,
-    desc,
-    status: "IDEA",
-    progress: 10,
-  });
-  save();
-  toast("Project created");
-  rerenderWorkspace("projects");
-}
-function advanceProject(i) {
-  if (!state.projects[i]) return;
-  state.projects[i].progress = Math.min(100, state.projects[i].progress + 20);
-  if (state.projects[i].progress === 100) state.projects[i].status = "DONE";
-  else if (state.projects[i].progress >= 60)
-    state.projects[i].status = "BUILDING";
-  save();
-  rerenderWorkspace("projects");
-}
-function cryptoSafeId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-function newApplication() {
-  const role = prompt("Role / internship / research opportunity");
-  if (!role) return;
-  const company = prompt("Company / lab / organization") || "";
-  state.applications.push({
-    id: cryptoSafeId(),
-    role,
-    company,
-    status: "Research",
-    next: "Check requirements",
-  });
-  save();
-  toast("Opportunity added");
-  rerenderWorkspace("applications");
-}
-function cycleApplication(id) {
-  const order = ["Research", "Applied", "Interview", "Offer / Closed"];
-  const a = state.applications.find((x) => x.id === id);
-  if (!a) return;
-  a.status = order[(order.indexOf(a.status) + 1) % order.length];
-  a.next =
-    a.status === "Applied"
-      ? "Prepare interview stories"
-      : a.status === "Interview"
-        ? "Prepare for interview"
-        : a.status === "Offer / Closed"
-          ? "Archive or reflect"
-          : "Check fit and requirements";
-  save();
-  rerenderWorkspace("applications");
-}
-function answerAssessment(q, a) {
-  state.assessment[q] = a;
-  save();
-  rerenderWorkspace("assessment");
-}
-function finishAssessment() {
-  toast("Assessment saved as a reflection signal");
-}
-function addJournal() {
-  const el = document.getElementById("journalText"),
-    v = el?.value.trim();
-  if (!v) return;
-  state.journal.unshift({ date: new Date().toLocaleString(), text: v });
-  save();
-  toast("Reflection saved");
-  rerenderWorkspace("journal");
-}
-function exportProfile() {
-  const copy = { ...state, exportedAt: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(copy, null, 2)], {
-    type: "application/json",
-  });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "horizon-profile.json";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  toast("Profile exported");
-}
-function logoutToLogin() {
-  const keepTheme = state.theme || "atelier";
-  state = structuredClone(defaultState);
-  state.theme = keepTheme;
-  try {
-    localStorage.setItem("horizon-real-state-v4", JSON.stringify(state));
-  } catch (e) {}
-  document.documentElement.dataset.theme = keepTheme;
-  boot();
-}
-function resetLocal() {
-  if (!confirm("Reset all Horizon data stored in this browser?")) return;
-  localStorage.removeItem("horizon-real-state-v4");
-  location.reload();
-}
-function toggleFocus() {
-  state.focus = !state.focus;
-  save();
-  if (state.focus) {
-    document.body.innerHTML = `<div style="min-height:100vh;display:grid;place-items:center;background:var(--bg);padding:30px"><div class="card" style="width:min(700px,100%);text-align:center"><span class="kicker">FOCUS MODE</span><h1 style="font:800 58px Fraunces;margin:12px 0">${esc(nextAction())}</h1><p style="color:var(--muted)">One action. One timer. No dashboard noise.</p><div style="font:800 68px Fraunces;margin:25px 0" id="focusTimer">25:00</div><div style="display:flex;justify-content:center;gap:10px"><button class="btn primary" onclick="startFocusTimer()">Start 25 min</button><button class="btn" onclick="state.focus=false;save();location.reload()">Exit focus</button></div></div></div>`;
-  } else location.reload();
-}
-let focusInt = null;
-function startFocusTimer() {
-  let sec = 25 * 60;
-  clearInterval(focusInt);
-  focusInt = setInterval(() => {
-    sec--;
-    const m = String(Math.floor(sec / 60)).padStart(2, "0"),
-      s = String(sec % 60).padStart(2, "0");
-    document.getElementById("focusTimer").textContent = m + ":" + s;
-    if (sec <= 0) {
-      clearInterval(focusInt);
-      toast("Focus session complete");
-    }
-  }, 1000);
-}
-function openFeature(key, title) {
-  const map = {
-    profile: "profile",
-    skills: "skills",
-    careers: "discover",
-    compare: "compare",
-    saved: "saved",
-    gaps: "gaps",
-    roadmap: "roadmap",
-    planner: "planner",
-    projects: "projects",
-    applications: "applications",
-    assessment: "assessment",
-    journal: "journal",
-    focus: "settings",
-    analytics: "analytics",
-    market: "market",
-    sources: "sources",
-    theme: "settings",
-    settings: "settings",
-    search: "discover",
-    home: "home",
-  };
-  const dest = map[key] || "workspace";
-  if (dest === "workspace") {
-    route("workspace");
-    setTimeout(() => setPanel(key === "focus" ? "settings" : key), 0);
-  } else route(dest);
-}
-function openCommand() {
-  const cmd = document.getElementById("command"),
-    input = document.getElementById("cmdInput");
-  cmd.classList.add("open");
-  input.value = "";
-  renderCommands("");
-  setTimeout(() => input.focus(), 50);
-}
-function closeCommand() {
-  document.getElementById("command").classList.remove("open");
-}
-function renderCommands(q) {
-  const term = (q || "").toLowerCase();
-  let rows = [];
-  features.forEach((f) =>
-    rows.push({
-      label: f[1],
-      sub: f[2],
-      action: () => {
-        closeCommand();
-        openFeature(f[3], f[1]);
-      },
-    }),
-  );
-  ranked().forEach((c) =>
-    rows.push({
-      label: "Career: " + c.title,
-      sub: c.desc,
-      action: () => {
-        closeCommand();
-        openCareer(c.id);
-      },
-    }),
-  );
-  [
-    ["Courses", "courses"],
-    ["Internships", "internships"],
-    ["Hackathons", "hackathons"],
-    ["Company Offers", "companies"],
-  ].forEach(([label, key]) =>
-    rows.push({
-      label: label,
-      sub: "Open the personalized " + label.toLowerCase() + " hub",
-      action: () => {
-        closeCommand();
-        route(key);
-      },
-    }),
-  );
-  rows = rows
-    .filter((x) => (x.label + " " + x.sub).toLowerCase().includes(term))
-    .slice(0, 16);
-  document.getElementById("cmdList").innerHTML =
-    rows
-      .map(
-        (r, i) =>
-          `<button class="commandrow" onclick="(${r.action.toString()})()"><b>${esc(r.label)}</b><div style="font-size:10px;color:var(--soft);margin-top:2px">${esc(r.sub)}</div></button>`,
-      )
-      .join("") || `<div class="empty" style="border:0">Nothing found.</div>`;
-}
-document
-  .getElementById("cmdInput")
-  .addEventListener("input", (e) => renderCommands(e.target.value));
-document.getElementById("command").addEventListener("click", (e) => {
-  if (e.target.id === "command") closeCommand();
-});
-document.getElementById("modal").addEventListener("click", (e) => {
-  if (e.target.id === "modal") closeModal();
-});
-document.addEventListener("keydown", (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-    e.preventDefault();
-    openCommand();
+  function googleCareer(id) {
+    const c = careers.find((x) => x.id === id);
+    if (!c) return;
+    const q = encodeURIComponent(
+      `${c.title} career skills salary outlook official ${new Date().getFullYear()}`,
+    );
+    window.open("https://www.google.com/search?q=" + q, "_blank");
   }
-  if (e.key === "Escape") {
-    closeCommand();
-    closeModal();
-  }
-});
-function updateClock() {
-  const c = document.getElementById("clock");
-  if (c)
-    c.textContent = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+  function generateCareerTask(id) {
+    const c = careers.find((x) => x.id === id);
+    state.tasks.push({
+      title: `Research ${c.title} and choose one skill to deepen`,
+      done: false,
     });
-}
-setInterval(updateClock, 1000);
-window.addEventListener("resize", () => {
-  if (document.getElementById("marketChart")) drawChart();
-});
-document.addEventListener("mousemove", (e) => {
-  const el = document.getElementById("tilt");
-  if (!el) return;
-  const r = el.getBoundingClientRect();
-  if (
-    e.clientX >= r.left &&
-    e.clientX <= r.right &&
-    e.clientY >= r.top &&
-    e.clientY <= r.bottom
-  ) {
-    const x = (e.clientX - r.left) / r.width - 0.5,
-      y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.transform = `perspective(900px) rotateY(${x * 4}deg) rotateX(${y * -4}deg)`;
-  } else el.style.transform = "";
-});
+    save();
+    toast("Roadmap action added");
+  }
+  function generateRoadmap() {
+    const role = getTargetRole();
+    if (!role) {
+      toast("Add recognized skills before generating a roadmap.");
+      return;
+    }
+    generateTargetRoadmap(role.id);
+  }
 
-function boot() {
-  document.documentElement.dataset.theme = state.theme;
-  /* Entry gate: always show the login screen first when this file is opened. */
-  document.getElementById("root").innerHTML =
-    `<div class="loginwrap"><div class="loginbox"><div class="loginhero"><span class="kicker">HORIZON / STUDENT CAREER INTELLIGENCE</span><h2>Career clarity, without the career-cliché.</h2><p>Start with a simple profile. Horizon then gives you a living workspace for discovery, skill gaps, roadmaps, projects, applications and market context.</p><div class="tags" style="margin-top:25px"><span class="tag">25 working modules</span><span class="tag">Light editorial UI</span><span class="tag">Local-first</span><span class="tag">Source-labelled</span></div></div><div class="loginpanel"><span class="kicker">WELCOME / LOGIN</span><h3>Enter Horizon</h3><p>Start or switch your local Horizon profile. This single-file build does not use a server-side account system.</p><input id="quickName" class="field" style="width:100%;margin-bottom:10px" placeholder="Your name" autocomplete="name"><input id="quickEmail" class="field" style="width:100%;margin-bottom:16px" placeholder="Email (optional)" autocomplete="email"><button class="btn primary" style="width:100%" onclick="quickStart()">Login / Continue →</button><div class="notice" style="margin-top:15px">Your information is kept in this browser. Use <b>Login / Switch</b> in the top navigation any time to return here.</div></div></div></div>`;
-  updateClock();
-}
-function quickStart() {
-  const name = document.getElementById("quickName").value.trim();
-  const email = document.getElementById("quickEmail").value.trim();
-  const errors = validateProfileFields({
-    name,
-    email,
-    field: "",
-    interests: "",
-    skills: [],
+  function generateGapTasks() {
+    const target = getTargetRole();
+    if (!target) {
+      toast("Add recognized skills before generating gap tasks.");
+      return;
+    }
+    const mine = profileSkillSet();
+    target.skills
+      .filter((s) => !mine.has(normalizeSkill(s)))
+      .forEach((s) => {
+        const title = `Practice ${s} and create evidence`;
+        if (!state.tasks.some((t) => t.title === title))
+          state.tasks.push({ title, done: false });
+      });
+    save();
+    toast("Gap-closing tasks added");
+    rerenderWorkspace("planner");
+  }
+  function toggleTask(i) {
+    if (i < 0) return;
+    if (state.tasks[i]) {
+      state.tasks[i].done = !state.tasks[i].done;
+      save();
+      rerenderWorkspace("overview");
+    }
+  }
+  function addTask() {
+    const el = document.getElementById("taskInput"),
+      v = el?.value.trim();
+    if (!v) return;
+    state.tasks.push({ title: v, done: false });
+    save();
+    toast("Task added");
+    rerenderWorkspace("planner");
+  }
+  function deleteTask(i) {
+    state.tasks.splice(i, 1);
+    save();
+    rerenderWorkspace("planner");
+  }
+  function newProject() {
+    const title = prompt("Project title");
+    if (!title) return;
+    const desc = prompt("What problem will it solve or investigate?") || "";
+    state.projects.push({
+      id: cryptoSafeId(),
+      title,
+      desc,
+      status: "IDEA",
+      progress: 10,
+    });
+    save();
+    toast("Project created");
+    rerenderWorkspace("projects");
+  }
+  function advanceProject(i) {
+    if (!state.projects[i]) return;
+    state.projects[i].progress = Math.min(100, state.projects[i].progress + 20);
+    if (state.projects[i].progress === 100) state.projects[i].status = "DONE";
+    else if (state.projects[i].progress >= 60)
+      state.projects[i].status = "BUILDING";
+    save();
+    rerenderWorkspace("projects");
+  }
+  function cryptoSafeId() {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+  function newApplication() {
+    const role = prompt("Role / internship / research opportunity");
+    if (!role) return;
+    const company = prompt("Company / lab / organization") || "";
+    state.applications.push({
+      id: cryptoSafeId(),
+      role,
+      company,
+      status: "Research",
+      next: "Check requirements",
+    });
+    save();
+    toast("Opportunity added");
+    rerenderWorkspace("applications");
+  }
+  function cycleApplication(id) {
+    const order = ["Research", "Applied", "Interview", "Offer / Closed"];
+    const a = state.applications.find((x) => x.id === id);
+    if (!a) return;
+    a.status = order[(order.indexOf(a.status) + 1) % order.length];
+    a.next =
+      a.status === "Applied"
+        ? "Prepare interview stories"
+        : a.status === "Interview"
+          ? "Prepare for interview"
+          : a.status === "Offer / Closed"
+            ? "Archive or reflect"
+            : "Check fit and requirements";
+    save();
+    rerenderWorkspace("applications");
+  }
+  function answerAssessment(q, a) {
+    state.assessment[q] = a;
+    save();
+    rerenderWorkspace("assessment");
+  }
+  function finishAssessment() {
+    toast("Assessment saved as a reflection signal");
+  }
+  function addJournal() {
+    const el = document.getElementById("journalText"),
+      v = el?.value.trim();
+    if (!v) return;
+    state.journal.unshift({ date: new Date().toLocaleString(), text: v });
+    save();
+    toast("Reflection saved");
+    rerenderWorkspace("journal");
+  }
+  function exportProfile() {
+    const copy = { ...state, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(copy, null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "horizon-profile.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast("Profile exported");
+  }
+  function logoutToLogin() {
+    const keepTheme = state.theme || "atelier";
+    state = structuredClone(defaultState);
+    state.theme = keepTheme;
+    try {
+      localStorage.setItem("horizon-real-state-v4", JSON.stringify(state));
+    } catch (e) { }
+    document.documentElement.dataset.theme = keepTheme;
+    boot();
+  }
+  function resetLocal() {
+    if (!confirm("Reset all Horizon data stored in this browser?")) return;
+    localStorage.removeItem("horizon-real-state-v4");
+    location.reload();
+  }
+  function toggleFocus() {
+    state.focus = !state.focus;
+    save();
+    if (state.focus) {
+      document.body.innerHTML = `<div style="min-height:100vh;display:grid;place-items:center;background:var(--bg);padding:30px"><div class="card" style="width:min(700px,100%);text-align:center"><span class="kicker">FOCUS MODE</span><h1 style="font:800 58px Fraunces;margin:12px 0">${esc(nextAction())}</h1><p style="color:var(--muted)">One action. One timer. No dashboard noise.</p><div style="font:800 68px Fraunces;margin:25px 0" id="focusTimer">25:00</div><div style="display:flex;justify-content:center;gap:10px"><button class="btn primary" onclick="startFocusTimer()">Start 25 min</button><button class="btn" onclick="state.focus=false;save();location.reload()">Exit focus</button></div></div></div>`;
+    } else location.reload();
+  }
+  let focusInt = null;
+  function startFocusTimer() {
+    let sec = 25 * 60;
+    clearInterval(focusInt);
+    focusInt = setInterval(() => {
+      sec--;
+      const m = String(Math.floor(sec / 60)).padStart(2, "0"),
+        s = String(sec % 60).padStart(2, "0");
+      document.getElementById("focusTimer").textContent = m + ":" + s;
+      if (sec <= 0) {
+        clearInterval(focusInt);
+        toast("Focus session complete");
+      }
+    }, 1000);
+  }
+  function openFeature(key, title) {
+    const map = {
+      profile: "profile",
+      skills: "skills",
+      careers: "discover",
+      compare: "compare",
+      saved: "saved",
+      gaps: "gaps",
+      roadmap: "roadmap",
+      planner: "planner",
+      projects: "projects",
+      applications: "applications",
+      assessment: "assessment",
+      journal: "journal",
+      focus: "settings",
+      analytics: "analytics",
+      market: "market",
+      sources: "sources",
+      arena: "arena",
+      contests: "arena",
+      dsa: "workspace",
+      theme: "settings",
+      settings: "settings",
+      search: "discover",
+      home: "home",
+    };
+    const dest = map[key] || "workspace";
+    if (dest === "workspace") {
+      route("workspace");
+      setTimeout(() => setPanel(key === "focus" ? "settings" : key), 0);
+    } else route(dest);
+  }
+  function openCommand() {
+    const cmd = document.getElementById("command"),
+      input = document.getElementById("cmdInput");
+    cmd.classList.add("open");
+    input.value = "";
+    renderCommands("");
+    setTimeout(() => input.focus(), 50);
+  }
+  function closeCommand() {
+    document.getElementById("command").classList.remove("open");
+  }
+  function renderCommands(q) {
+    const term = (q || "").toLowerCase();
+    let rows = [];
+    features.forEach((f) =>
+      rows.push({
+        label: f[1],
+        sub: f[2],
+        action: () => {
+          closeCommand();
+          openFeature(f[3], f[1]);
+        },
+      }),
+    );
+    ranked().forEach((c) =>
+      rows.push({
+        label: "Career: " + c.title,
+        sub: c.desc,
+        action: () => {
+          closeCommand();
+          openCareer(c.id);
+        },
+      }),
+    );
+    [
+      [
+        "Contests & Arena",
+        "arena",
+        "Explore verified contests, campus leaderboards & AI anti-cheating safeguard",
+      ],
+      ["Courses", "courses", "Open the personalized courses hub"],
+      ["Internships", "internships", "Open the personalized internships hub"],
+      ["Hackathons", "hackathons", "Open the personalized hackathons hub"],
+      ["Company Offers", "companies", "Open the personalized companies hub"],
+    ].forEach(([label, key, customSub]) =>
+      rows.push({
+        label: label,
+        sub: customSub || ("Open the personalized " + label.toLowerCase() + " hub"),
+        action: () => {
+          closeCommand();
+          route(key);
+        },
+      }),
+    );
+    rows.push({
+      label: "Contests: LeetCode & Codeforces Radar",
+      sub: "Check upcoming competitive rounds and set reminders",
+      action: () => {
+        closeCommand();
+        route("arena");
+        setTimeout(() => setArenaFilter("competitive"), 60);
+      },
+    });
+    rows.push({
+      label: "Contests: Smart India Hackathon & MLH",
+      sub: "Explore national student hackathons and team deadlines",
+      action: () => {
+        closeCommand();
+        route("arena");
+        setTimeout(() => setArenaFilter("hackathons"), 60);
+      },
+    });
+    rows.push({
+      label: "Campus & Global Leaderboard",
+      sub: "Rank peers by consistency score, problems solved and contest ratings",
+      action: () => {
+        closeCommand();
+        route("arena");
+        setTimeout(() => {
+          const el = document.getElementById("leaderboardSection");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      },
+    });
+    rows.push({
+      label: "AI Anti-Cheating & Integrity Protocol",
+      sub: "Run code integrity audit demo and AST plagiarism check",
+      action: () => {
+        closeCommand();
+        route("arena");
+        setTimeout(() => {
+          const el = document.getElementById("integritySection");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+          runIntegrityAudit("peerPlagiarism");
+        }, 120);
+      },
+    });
+    rows = rows
+      .filter((x) => (x.label + " " + x.sub).toLowerCase().includes(term))
+      .slice(0, 16);
+    document.getElementById("cmdList").innerHTML =
+      rows
+        .map(
+          (r, i) =>
+            `<button class="commandrow" onclick="(${r.action.toString()})()"><b>${esc(r.label)}</b><div style="font-size:10px;color:var(--soft);margin-top:2px">${esc(r.sub)}</div></button>`,
+        )
+        .join("") || `<div class="empty" style="border:0">Nothing found.</div>`;
+  }
+  document
+    .getElementById("cmdInput")
+    .addEventListener("input", (e) => renderCommands(e.target.value));
+  document.getElementById("command").addEventListener("click", (e) => {
+    if (e.target.id === "command") closeCommand();
   });
-  if (errors.length) {
-    toast(errors[0]);
-    return;
+  document.getElementById("modal").addEventListener("click", (e) => {
+    if (e.target.id === "modal") closeModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      openCommand();
+    }
+    if (e.key === "Escape") {
+      closeCommand();
+      closeModal();
+    }
+  });
+  function updateClock() {
+    const c = document.getElementById("clock");
+    if (c)
+      c.textContent = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
   }
-  state.name = name || "Student";
-  state.email = email;
-  save();
-  route("home");
-  setTimeout(openProfile, 250);
-}
-/* ===================== W-COMBINATORS AI ENGINE ===================== */
-const WC = {
-  model: "gemini-3.8-flash",
-  endpoint: "/.netlify/functions/wcombinators",
-  keyStore: "horizon-wc-gemini-key-v2",
-  chatStore: "horizon-wc-chat-v2",
-  maxHistory: 30,
-  recognition: null,
-  listening: false,
-  speaking: false,
-  busy: false,
-  route: "home",
-  panel: "home",
-  pageText: "",
-};
-let wcChat = [];
-try {
-  const x = JSON.parse(localStorage.getItem(WC.chatStore) || "[]");
-  if (Array.isArray(x))
-    wcChat = x
-      .filter(
-        (m) =>
-          m &&
-          (m.role === "user" || m.role === "assistant") &&
-          typeof m.text === "string",
-      )
-      .slice(-WC.maxHistory);
-} catch (e) {}
-function wcGetKey() {
-  try {
-    return (
-      sessionStorage.getItem(WC.keyStore) ||
-      localStorage.getItem(WC.keyStore) ||
-      ""
-    );
-  } catch (e) {
-    return "";
+  setInterval(updateClock, 1000);
+  window.addEventListener("resize", () => {
+    if (document.getElementById("marketChart")) drawChart();
+  });
+  document.addEventListener("mousemove", (e) => {
+    const el = document.getElementById("tilt");
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (
+      e.clientX >= r.left &&
+      e.clientX <= r.right &&
+      e.clientY >= r.top &&
+      e.clientY <= r.bottom
+    ) {
+      const x = (e.clientX - r.left) / r.width - 0.5,
+        y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(900px) rotateY(${x * 4}deg) rotateX(${y * -4}deg)`;
+    } else el.style.transform = "";
+  });
+
+  function boot() {
+    document.documentElement.dataset.theme = state.theme;
+    /* Entry gate: always show the login screen first when this file is opened. */
+    document.getElementById("root").innerHTML =
+      `<div class="loginwrap"><div class="loginbox"><div class="loginhero"><span class="kicker">HORIZON / STUDENT CAREER INTELLIGENCE</span><h2>Career clarity, without the career-cliché.</h2><p>Start with a simple profile. Horizon then gives you a living workspace for discovery, skill gaps, roadmaps, projects, applications and market context.</p><div class="tags" style="margin-top:25px"><span class="tag">25 working modules</span><span class="tag">Light editorial UI</span><span class="tag">Local-first</span><span class="tag">Source-labelled</span></div></div><div class="loginpanel"><span class="kicker">WELCOME / LOGIN</span><h3>Enter Horizon</h3><p>Start or switch your local Horizon profile. This single-file build does not use a server-side account system.</p><input id="quickName" class="field" style="width:100%;margin-bottom:10px" placeholder="Your name" autocomplete="name"><input id="quickEmail" class="field" style="width:100%;margin-bottom:16px" placeholder="Email (optional)" autocomplete="email"><button class="btn primary" style="width:100%" onclick="quickStart()">Login / Continue →</button><div class="notice" style="margin-top:15px">Your information is kept in this browser. Use <b>Login / Switch</b> in the top navigation any time to return here.</div></div></div></div>`;
+    updateClock();
   }
-}
-function wcSaveChat() {
+  function quickStart() {
+    const name = document.getElementById("quickName").value.trim();
+    const email = document.getElementById("quickEmail").value.trim();
+    const errors = validateProfileFields({
+      name,
+      email,
+      field: "",
+      interests: "",
+      skills: [],
+    });
+    if (errors.length) {
+      toast(errors[0]);
+      return;
+    }
+    state.name = name || "Student";
+    state.email = email;
+    save();
+    route("home");
+    setTimeout(openProfile, 250);
+  }
+  /* ===================== W-COMBINATORS AI ENGINE ===================== */
+  const WC = {
+    model: "gemini-3.8-flash",
+    endpoint: "/.netlify/functions/wcombinators",
+    keyStore: "horizon-wc-gemini-key-v2",
+    chatStore: "horizon-wc-chat-v2",
+    maxHistory: 30,
+    recognition: null,
+    listening: false,
+    speaking: false,
+    busy: false,
+    route: "home",
+    panel: "home",
+    pageText: "",
+  };
+  let wcChat = [];
   try {
-    localStorage.setItem(
-      WC.chatStore,
-      JSON.stringify(wcChat.slice(-WC.maxHistory)),
-    );
-  } catch (e) {}
-}
-function wcScroll() {
-  const el = document.getElementById("wcMessages");
-  if (el) requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
-}
-function wcSetSubtitle(t) {
-  const el = document.getElementById("wcSubtitle");
-  if (el) el.textContent = t;
-}
-function wcRefreshContext() {
-  const root = document.getElementById("root");
-  WC.pageText = (root?.innerText || "").replace(/\s+/g, " ").slice(0, 12000);
-  const p = document.getElementById("wcPageChip");
-  if (p)
-    p.textContent = `HORIZON · ${WC.route}${WC.panel ? ` / ${WC.panel}` : ""}`;
-  const k = document.getElementById("wcKeyState");
-  if (k) k.textContent = wcGetKey() ? "AI + Google active" : "Local mode";
-  const w = document.getElementById("wcWebChip");
-  if (w)
-    w.textContent = wcGetKey() ? "Google grounding" : "Google search ready";
-  const v = document.getElementById("wcVoiceChip");
-  if (v)
-    v.textContent =
-      window.SpeechRecognition || window.webkitSpeechRecognition
-        ? "Voice ready"
-        : "Voice unavailable";
-}
-function wcToggle() {
-  const p = document.getElementById("wcPanel");
-  if (!p) return;
-  const open = !p.classList.contains("open");
-  p.classList.toggle("open", open);
-  if (open) {
+    const x = JSON.parse(localStorage.getItem(WC.chatStore) || "[]");
+    if (Array.isArray(x))
+      wcChat = x
+        .filter(
+          (m) =>
+            m &&
+            (m.role === "user" || m.role === "assistant") &&
+            typeof m.text === "string",
+        )
+        .slice(-WC.maxHistory);
+  } catch (e) { }
+  function wcGetKey() {
+    try {
+      return (
+        sessionStorage.getItem(WC.keyStore) ||
+        localStorage.getItem(WC.keyStore) ||
+        ""
+      );
+    } catch (e) {
+      return "";
+    }
+  }
+  function wcSaveChat() {
+    try {
+      localStorage.setItem(
+        WC.chatStore,
+        JSON.stringify(wcChat.slice(-WC.maxHistory)),
+      );
+    } catch (e) { }
+  }
+  function wcScroll() {
+    const el = document.getElementById("wcMessages");
+    if (el) requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+  }
+  function wcSetSubtitle(t) {
+    const el = document.getElementById("wcSubtitle");
+    if (el) el.textContent = t;
+  }
+  function wcRefreshContext() {
+    const root = document.getElementById("root");
+    WC.pageText = (root?.innerText || "").replace(/\s+/g, " ").slice(0, 12000);
+    const p = document.getElementById("wcPageChip");
+    if (p)
+      p.textContent = `HORIZON · ${WC.route}${WC.panel ? ` / ${WC.panel}` : ""}`;
+    const k = document.getElementById("wcKeyState");
+    if (k) k.textContent = wcGetKey() ? "AI + Google active" : "Local mode";
+    const w = document.getElementById("wcWebChip");
+    if (w)
+      w.textContent = wcGetKey() ? "Google grounding" : "Google search ready";
+    const v = document.getElementById("wcVoiceChip");
+    if (v)
+      v.textContent =
+        window.SpeechRecognition || window.webkitSpeechRecognition
+          ? "Voice ready"
+          : "Voice unavailable";
+  }
+  function wcToggle() {
+    const p = document.getElementById("wcPanel");
+    if (!p) return;
+    const open = !p.classList.contains("open");
+    p.classList.toggle("open", open);
+    if (open) {
+      wcRenderChat();
+      wcRefreshContext();
+      setTimeout(() => document.getElementById("wcInput")?.focus(), 80);
+    }
+  }
+  function wcToggleSettings() {
+    const s = document.getElementById("wcSettings");
+    if (!s) return;
+    s.classList.toggle("open");
+    const i = document.getElementById("wcApiKey");
+    if (i) i.value = wcGetKey();
+  }
+  function wcClearChat() {
+    wcChat = [];
+    wcSaveChat();
     wcRenderChat();
-    wcRefreshContext();
-    setTimeout(() => document.getElementById("wcInput")?.focus(), 80);
+    wcPush("assistant", "Chat cleared. I’m ready for your next problem.");
   }
-}
-function wcToggleSettings() {
-  const s = document.getElementById("wcSettings");
-  if (!s) return;
-  s.classList.toggle("open");
-  const i = document.getElementById("wcApiKey");
-  if (i) i.value = wcGetKey();
-}
-function wcClearChat() {
-  wcChat = [];
-  wcSaveChat();
-  wcRenderChat();
-  wcPush("assistant", "Chat cleared. I’m ready for your next problem.");
-}
-function wcPush(role, text, meta = {}) {
-  wcChat.push({ role, text, meta });
-  wcChat = wcChat.slice(-WC.maxHistory);
-  wcSaveChat();
-  wcRenderChat();
-}
-function wcRenderChat() {
-  const box = document.getElementById("wcMessages");
-  if (!box) return;
-  const items = wcChat.length
-    ? wcChat
-    : [
+  function wcPush(role, text, meta = {}) {
+    wcChat.push({ role, text, meta });
+    wcChat = wcChat.slice(-WC.maxHistory);
+    wcSaveChat();
+    wcRenderChat();
+  }
+  function wcRenderChat() {
+    const box = document.getElementById("wcMessages");
+    if (!box) return;
+    const items = wcChat.length
+      ? wcChat
+      : [
         {
           role: "assistant",
           text: "Hey — I’m **W-Combinators**. I can guide you around HORIZON, act on your workspace, explain career data, build study plans, take voice input, and answer broader educational questions when Gemini is connected.",
@@ -5709,565 +7211,574 @@ function wcRenderChat() {
           },
         },
       ];
-  box.innerHTML = items.map((m, i) => wcMessageHTML(m, i)).join("");
-  wcScroll();
-}
-function escAttr(v) {
-  return String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-function wcFormat(raw) {
-  let s = esc(String(raw || ""));
-  const blocks = [];
-  s = s.replace(/```([\s\S]*?)```/g, (_, c) => {
-    const id = `WCBLOCK${blocks.length}`;
-    blocks.push(`<div class="wc-code">${c.trim()}</div>`);
-    return id;
-  });
-  s = s.replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>");
-  s = s.replace(/(?:<li>[\s\S]*?<\/li>\s*)+/g, (x) => `<ul>${x}</ul>`);
-  s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
-  s = s.replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>");
-  s = `<p>${s}</p>`;
-  blocks.forEach((b, i) => (s = s.replace(`WCBLOCK${i}`, b)));
-  return s;
-}
-function wcMessageHTML(m, i) {
-  const user = m.role === "user";
-  let a = "";
-  if (!user && m.meta?.actions)
-    a += `<div class="wc-actions">${m.meta.actions.map((x) => `<button class="wc-action" onclick="${escAttr(x[1])}">${esc(x[0])}</button>`).join("")}</div>`;
-  if (!user)
-    a += `<div class="wc-actions"><button class="wc-action" onclick="wcSpeak(${i})">🔊 Read aloud</button>${m.meta?.searchUrl ? `<a class="wc-action" href="${escAttr(m.meta.searchUrl)}" target="_blank" rel="noopener">Google ↗</a>` : ""}${m.meta?.sources?.length ? `<button class="wc-action" onclick="wcShowSources(${i})">Sources (${m.meta.sources.length})</button>` : ""}</div>`;
-  return `<div class="wc-msg ${user ? "user" : "assistant"}">${user ? "" : `<div class="wc-avatar">W</div>`}<div class="wc-bubble">${wcFormat(m.text)}${a}</div></div>`;
-}
-function wcScrollToEnd() {
-  wcScroll();
-}
-function wcAutoResize() {
-  const e = document.getElementById("wcInput");
-  if (!e) return;
-  e.style.height = "auto";
-  e.style.height = Math.min(e.scrollHeight, 110) + "px";
-}
-function wcSendText(t) {
-  const e = document.getElementById("wcInput");
-  if (!e) return;
-  e.value = t;
-  wcAutoResize();
-  wcSend();
-}
-function wcAppendTyping() {
-  const b = document.getElementById("wcMessages");
-  if (!b) return;
-  document.getElementById("wcTypingMsg")?.remove();
-  b.insertAdjacentHTML(
-    "beforeend",
-    `<div class="wc-msg assistant" id="wcTypingMsg"><div class="wc-avatar">W</div><div class="wc-bubble"><div class="wc-typing"><i></i><i></i><i></i></div></div></div>`,
-  );
-  wcScroll();
-}
-function wcRemoveTyping() {
-  document.getElementById("wcTypingMsg")?.remove();
-}
-function wcSpeak(i) {
-  const m = wcChat[i];
-  if (!m || !window.speechSynthesis) {
-    toast("Read-aloud is not supported in this browser.");
-    return;
+    box.innerHTML = items.map((m, i) => wcMessageHTML(m, i)).join("");
+    wcScroll();
   }
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(
-    String(m.text || "").replace(/[*#`]/g, ""),
-  );
-  u.rate = 0.98;
-  WC.speaking = true;
-  u.onend = () => (WC.speaking = false);
-  u.onerror = () => (WC.speaking = false);
-  speechSynthesis.speak(u);
-}
-function wcShowSources(i) {
-  const m = wcChat[i];
-  if (!m?.meta?.sources?.length) return;
-  openModal(
-    `<div class="modalhead"><div><span class="kicker">W-COMBINATORS / SOURCES</span><h3 style="font:800 28px Fraunces">Grounding references</h3></div><button class="close" onclick="closeModal()">✕</button></div>${m.meta.sources.map((s) => `<div class="listrow"><div style="flex:1"><b>${esc(s.title || "Web source")}</b><div class="source">${esc(s.url || "")}</div></div><a class="resource-link" href="${escAttr(s.url || "#")}" target="_blank" rel="noopener">Open ↗</a></div>`).join("")}`,
-  );
-}
-function wcInitVoice() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const mic = document.getElementById("wcMic");
-  if (!SR) {
-    if (mic) {
-      mic.disabled = true;
-      mic.title = "Speech recognition is not supported in this browser";
-    }
-    return;
+  function escAttr(v) {
+    return String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
-  const r = new SR();
-  r.lang = navigator.language || "en-IN";
-  r.interimResults = true;
-  r.continuous = false;
-  r.maxAlternatives = 1;
-  r.onstart = () => {
-    WC.listening = true;
-    mic?.classList.add("recording");
-    wcSetSubtitle("Listening… speak your question");
-  };
-  r.onresult = (e) => {
-    const input = document.getElementById("wcInput");
-    if (!input) return;
-    let interim = "",
-      finalText = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i]?.[0]?.transcript || "";
-      if (e.results[i].isFinal) finalText += t;
-      else interim += t;
-    }
-    input.value = finalText || interim;
-    wcAutoResize();
-    if (finalText.trim()) setTimeout(wcSend, 100);
-  };
-  r.onerror = (e) => {
-    WC.listening = false;
-    mic?.classList.remove("recording");
-    toast(
-      e.error === "not-allowed"
-        ? "Microphone permission was blocked. Allow access and try again."
-        : `Voice input: ${e.error}`,
-    );
-  };
-  r.onend = () => {
-    WC.listening = false;
-    mic?.classList.remove("recording");
-    wcRefreshContext();
-  };
-  WC.recognition = r;
-}
-function wcToggleMic() {
-  if (!WC.recognition) {
-    toast("Voice input is not supported in this browser.");
-    return;
-  }
-  if (WC.listening) {
-    WC.recognition.stop();
-    return;
-  }
-  try {
-    WC.recognition.start();
-  } catch (e) {
-    toast("Microphone is busy. Try again.");
-  }
-}
-function wcBuildKnowledge() {
-  const c = careers
-    .map(
-      (x) =>
-        `${x.title}: ${x.desc}; skills=${(x.skills || []).join(", ")}; growth=${x.growth}%; source=${x.source}; pay=${x.pay}`,
-    )
-    .join("\n");
-  const r = [
-    ...courseResources,
-    ...internshipResources,
-    ...hackathonResources,
-    ...companyResources,
-    ...guidanceResources,
-  ]
-    .slice(0, 180)
-    .map((x) => `${x.kind}: ${x.title} — ${x.desc} — ${x.url}`)
-    .join("\n");
-  return `HORIZON STATE\nRoute=${WC.route}; Panel=${WC.panel}\nProfile=${state.name || "Student"}; field=${state.field || "not set"}; goal=${state.goal}; interests=${state.interests || "not set"}; skills=${(state.skills || []).join(", ") || "none"}\nTasks=${(state.tasks || []).map((t) => `${t.done ? "DONE" : "OPEN"}: ${t.title}`).join(" | ") || "none"}\nProjects=${(state.projects || []).map((p) => `${p.title} (${p.progress}%, ${p.status})`).join(" | ") || "none"}\nApplications=${(state.applications || []).map((a) => `${a.role} @ ${a.company} [${a.status}]`).join(" | ") || "none"}\nSaved careers=${
-    (state.saved || [])
-      .map((id) => careers.find((c) => c.id === id)?.title)
-      .filter(Boolean)
-      .join(", ") || "none"
-  }\n\nFEATURES\n${features.map((f) => `${f[3]}: ${f[1]} — ${f[2]}`).join("\n")}\n\nCAREERS\n${c}\n\nRESOURCE CATALOG\n${r}\n\nCURRENT PAGE\n${WC.pageText}`;
-}
-function googleSearchText(q) {
-  window.open(
-    "https://www.google.com/search?q=" + encodeURIComponent(q),
-    "_blank",
-    "noopener",
-  );
-}
-function wcDetectAction(q) {
-  let m = q.trim().match(/^(?:open|go to|show|take me to)\s+(?:the\s+)?(.+)$/i);
-  if (m) {
-    const s = m[1].toLowerCase();
-    const maps = [
-      ["home", "home"],
-      ["careers", "discover"],
-      ["discover", "discover"],
-      ["target", "target"],
-      ["roadmap", "roadmap"],
-      ["workspace", "workspace"],
-      ["skills", "skills"],
-      ["gaps", "gaps"],
-      ["projects", "projects"],
-      ["applications", "applications"],
-      ["planner", "planner"],
-      ["assessment", "assessment"],
-      ["journal", "journal"],
-      ["analytics", "analytics"],
-      ["compare", "compare"],
-      ["saved careers", "saved"],
-      ["saved", "saved"],
-      ["profile", "profile"],
-      ["settings", "settings"],
-      ["market", "market"],
-      ["sources", "sources"],
-      ["courses", "courses"],
-      ["internships", "internships"],
-      ["hackathons", "hackathons"],
-      ["company offers", "companies"],
-    ];
-    const hit = maps.find(([k]) => s.includes(k));
-    if (hit) return { type: "nav", panel: hit[1], label: hit[0] };
-  }
-  m = q.trim().match(/^add\s+(?:a\s+)?task\s*[:\-]?\s*(.+)$/i);
-  if (m) return { type: "task", text: m[1] };
-  m = q.trim().match(/^add\s+(?:a\s+)?project\s*[:\-]?\s*(.+)$/i);
-  if (m) return { type: "project", text: m[1] };
-  m = q
-    .trim()
-    .match(
-      /^(?:set|make|choose)\s+(?:my\s+)?target\s+(?:career\s+)?(?:to|as)\s+(.+)$/i,
-    );
-  if (m) return { type: "target", text: m[1] };
-  m = q.trim().match(/^(?:search|google)\s+(?:google\s+)?(?:for\s+)?(.+)$/i);
-  if (m) return { type: "google", text: m[1] };
-  return null;
-}
-function wcExecuteAction(a) {
-  if (a.type === "nav") {
-    if (
-      [
-        "home",
-        "discover",
-        "target",
-        "workspace",
-        "market",
-        "sources",
-        "courses",
-        "internships",
-        "hackathons",
-        "companies",
-      ].includes(a.panel)
-    )
-      route(a.panel);
-    else {
-      route("workspace");
-      setTimeout(() => setPanel(a.panel), 0);
-    }
-    wcPush("assistant", `Done — I opened **${a.label}**.`);
-    return;
-  }
-  if (a.type === "task") {
-    state.tasks.push({ title: a.text.trim(), done: false });
-    save();
-    rerenderWorkspace("planner");
-    WC.route = "workspace";
-    WC.panel = "planner";
-    wcRefreshContext();
-    wcPush("assistant", `Added this task to Planner: **${a.text.trim()}**`);
-    return;
-  }
-  if (a.type === "project") {
-    state.projects.push({
-      id: cryptoSafeId(),
-      title: a.text.trim(),
-      desc: "Created through W-Combinators.",
-      status: "IDEA",
-      progress: 10,
+  function wcFormat(raw) {
+    let s = esc(String(raw || ""));
+    const blocks = [];
+    s = s.replace(/```([\s\S]*?)```/g, (_, c) => {
+      const id = `WCBLOCK${blocks.length}`;
+      blocks.push(`<div class="wc-code">${c.trim()}</div>`);
+      return id;
     });
-    save();
-    rerenderWorkspace("projects");
-    WC.route = "workspace";
-    WC.panel = "projects";
-    wcRefreshContext();
-    wcPush("assistant", `Created **${a.text.trim()}** in Project Studio.`);
-    return;
+    s = s.replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>");
+    s = s.replace(/(?:<li>[\s\S]*?<\/li>\s*)+/g, (x) => `<ul>${x}</ul>`);
+    s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+    s = s.replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>");
+    s = `<p>${s}</p>`;
+    blocks.forEach((b, i) => (s = s.replace(`WCBLOCK${i}`, b)));
+    return s;
   }
-  if (a.type === "target") {
-    const q = a.text.toLowerCase();
-    const c = careers.find(
-      (c) => q === c.id || q.includes(c.title.toLowerCase()),
+  function wcMessageHTML(m, i) {
+    const user = m.role === "user";
+    let a = "";
+    if (!user && m.meta?.actions)
+      a += `<div class="wc-actions">${m.meta.actions.map((x) => `<button class="wc-action" onclick="${escAttr(x[1])}">${esc(x[0])}</button>`).join("")}</div>`;
+    if (!user)
+      a += `<div class="wc-actions"><button class="wc-action" onclick="wcSpeak(${i})">🔊 Read aloud</button>${m.meta?.searchUrl ? `<a class="wc-action" href="${escAttr(m.meta.searchUrl)}" target="_blank" rel="noopener">Google ↗</a>` : ""}${m.meta?.sources?.length ? `<button class="wc-action" onclick="wcShowSources(${i})">Sources (${m.meta.sources.length})</button>` : ""}</div>`;
+    return `<div class="wc-msg ${user ? "user" : "assistant"}">${user ? "" : `<div class="wc-avatar">W</div>`}<div class="wc-bubble">${wcFormat(m.text)}${a}</div></div>`;
+  }
+  function wcScrollToEnd() {
+    wcScroll();
+  }
+  function wcAutoResize() {
+    const e = document.getElementById("wcInput");
+    if (!e) return;
+    e.style.height = "auto";
+    e.style.height = Math.min(e.scrollHeight, 110) + "px";
+  }
+  function wcSendText(t) {
+    const e = document.getElementById("wcInput");
+    if (!e) return;
+    e.value = t;
+    wcAutoResize();
+    wcSend();
+  }
+  function wcAppendTyping() {
+    const b = document.getElementById("wcMessages");
+    if (!b) return;
+    document.getElementById("wcTypingMsg")?.remove();
+    b.insertAdjacentHTML(
+      "beforeend",
+      `<div class="wc-msg assistant" id="wcTypingMsg"><div class="wc-avatar">W</div><div class="wc-bubble"><div class="wc-typing"><i></i><i></i><i></i></div></div></div>`,
     );
-    if (c) {
-      setTargetRole(c.id);
-      route("target");
-      wcPush(
-        "assistant",
-        `Target set to **${c.title}** and the target roadmap is open.`,
-      );
-    } else {
-      googleSearchText(`${a.text} student career skills official`);
-      wcPush(
-        "assistant",
-        `I couldn't map **${a.text}** to a built-in HORIZON career, so I opened Google research.`,
-      );
+    wcScroll();
+  }
+  function wcRemoveTyping() {
+    document.getElementById("wcTypingMsg")?.remove();
+  }
+  function wcSpeak(i) {
+    const m = wcChat[i];
+    if (!m || !window.speechSynthesis) {
+      toast("Read-aloud is not supported in this browser.");
+      return;
     }
-    return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(
+      String(m.text || "").replace(/[*#`]/g, ""),
+    );
+    u.rate = 0.98;
+    WC.speaking = true;
+    u.onend = () => (WC.speaking = false);
+    u.onerror = () => (WC.speaking = false);
+    speechSynthesis.speak(u);
   }
-  if (a.type === "google") {
-    googleSearchText(a.text);
-    wcPush("assistant", `Opened Google results for **${a.text}**.`);
+  function wcShowSources(i) {
+    const m = wcChat[i];
+    if (!m?.meta?.sources?.length) return;
+    openModal(
+      `<div class="modalhead"><div><span class="kicker">W-COMBINATORS / SOURCES</span><h3 style="font:800 28px Fraunces">Grounding references</h3></div><button class="close" onclick="closeModal()">✕</button></div>${m.meta.sources.map((s) => `<div class="listrow"><div style="flex:1"><b>${esc(s.title || "Web source")}</b><div class="source">${esc(s.url || "")}</div></div><a class="resource-link" href="${escAttr(s.url || "#")}" target="_blank" rel="noopener">Open ↗</a></div>`).join("")}`,
+    );
   }
-}
-function wcLocalAnswer(q) {
-  const x = q.toLowerCase();
-  if (/^(hi|hello|hey|yo)\b/.test(x))
-    return "Hey! 👋 Tell me the problem. I can guide you through HORIZON or help build a study plan.";
-  if (/who are you|what are you|w-combinators/.test(x))
-    return "I’m **W-Combinators**, the AI assistant built into HORIZON.";
-  if (/what can you do|help/.test(x))
-    return "I can navigate HORIZON, create tasks/projects, set target careers, explain HORIZON data, build study plans, take voice input, read answers aloud, and use Gemini + Google Search for broader educational questions.";
-  if (/where am i|current page|what page/.test(x))
-    return `You’re on **${WC.route}**${WC.panel ? ` → **${WC.panel}**` : ""}.`;
-  const kb = [
-    [
-      /photosynthesis/,
-      "Photosynthesis uses light energy to convert carbon dioxide and water into stored chemical energy in plants, releasing oxygen. I can explain it at school, NEET, or deeper level.",
-    ],
-    [
-      /newton.*laws?|laws?.*newton/,
-      "Newton’s three laws describe inertia, F=ma, and action–reaction pairs.",
-    ],
-    [
-      /quadratic/,
-      "A quadratic equation has the form ax² + bx + c = 0. The quadratic formula is x = (−b ± √(b²−4ac))/(2a).",
-    ],
-    [
-      /cell membrane|plasma membrane/,
-      "The plasma membrane is a selectively permeable phospholipid bilayer containing proteins and controlling movement of substances.",
-    ],
-    [
-      /noun|pronoun|adverb|adjective|conjunction/,
-      "Noun, pronoun, adjective, adverb and conjunction are parts of speech. I can also quiz you on them.",
-    ],
-  ];
-  for (const [re, ans] of kb) if (re.test(x)) return ans;
-  return "I’m in **local mode**. Website commands and built-in guidance work now; for open-ended educational answers, connect Gemini in ⚙ or use the Google button.";
-}
-function wcHistory() {
-  return wcChat
-    .slice(-12)
-    .map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: String(m.text || "") }],
-    }));
-}
-async function wcAskGemini(q, key) {
-  WC.busy = true;
-  wcAppendTyping();
-  const system = `You are W-Combinators, an educational AI agent inside HORIZON. Be fluent, problem-first, concise but helpful. Use the supplied HORIZON state as authoritative for HORIZON-specific facts and actions. Never invent site features or user data. For general education, teach clearly and step-by-step. Use Google Search grounding for current or niche facts. If a response can be solved directly from the site context, do that without unnecessary web search.
+  function wcInitVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const mic = document.getElementById("wcMic");
+    if (!SR) {
+      if (mic) {
+        mic.disabled = true;
+        mic.title = "Speech recognition is not supported in this browser";
+      }
+      return;
+    }
+    const r = new SR();
+    r.lang = navigator.language || "en-IN";
+    r.interimResults = true;
+    r.continuous = false;
+    r.maxAlternatives = 1;
+    r.onstart = () => {
+      WC.listening = true;
+      mic?.classList.add("recording");
+      wcSetSubtitle("Listening… speak your question");
+    };
+    r.onresult = (e) => {
+      const input = document.getElementById("wcInput");
+      if (!input) return;
+      let interim = "",
+        finalText = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i]?.[0]?.transcript || "";
+        if (e.results[i].isFinal) finalText += t;
+        else interim += t;
+      }
+      input.value = finalText || interim;
+      wcAutoResize();
+      if (finalText.trim()) setTimeout(wcSend, 100);
+    };
+    r.onerror = (e) => {
+      WC.listening = false;
+      mic?.classList.remove("recording");
+      toast(
+        e.error === "not-allowed"
+          ? "Microphone permission was blocked. Allow access and try again."
+          : `Voice input: ${e.error}`,
+      );
+    };
+    r.onend = () => {
+      WC.listening = false;
+      mic?.classList.remove("recording");
+      wcRefreshContext();
+    };
+    WC.recognition = r;
+  }
+  function wcToggleMic() {
+    if (!WC.recognition) {
+      toast("Voice input is not supported in this browser.");
+      return;
+    }
+    if (WC.listening) {
+      WC.recognition.stop();
+      return;
+    }
+    try {
+      WC.recognition.start();
+    } catch (e) {
+      toast("Microphone is busy. Try again.");
+    }
+  }
+  function wcBuildKnowledge() {
+    const c = careers
+      .map(
+        (x) =>
+          `${x.title}: ${x.desc}; skills=${(x.skills || []).join(", ")}; growth=${x.growth}%; source=${x.source}; pay=${x.pay}`,
+      )
+      .join("\n");
+    const r = [
+      ...courseResources,
+      ...internshipResources,
+      ...hackathonResources,
+      ...companyResources,
+      ...guidanceResources,
+    ]
+      .slice(0, 180)
+      .map((x) => `${x.kind}: ${x.title} — ${x.desc} — ${x.url}`)
+      .join("\n");
+    return `HORIZON STATE\nRoute=${WC.route}; Panel=${WC.panel}\nProfile=${state.name || "Student"}; field=${state.field || "not set"}; goal=${state.goal}; interests=${state.interests || "not set"}; skills=${(state.skills || []).join(", ") || "none"}\nTasks=${(state.tasks || []).map((t) => `${t.done ? "DONE" : "OPEN"}: ${t.title}`).join(" | ") || "none"}\nProjects=${(state.projects || []).map((p) => `${p.title} (${p.progress}%, ${p.status})`).join(" | ") || "none"}\nApplications=${(state.applications || []).map((a) => `${a.role} @ ${a.company} [${a.status}]`).join(" | ") || "none"}\nDSAStreak=${getDSAStreak()}; DSATotalSolved=${Object.values(state.practiceLog || {}).reduce((a, b) => a + b, 0)}; DSASolvedProblems=${(state.solvedProblems || []).length}\\nSaved careers=${(state.saved || [])
+        .map((id) => careers.find((c) => c.id === id)?.title)
+        .filter(Boolean)
+        .join(", ") || "none"
+      }\n\nFEATURES\n${features.map((f) => `${f[3]}: ${f[1]} — ${f[2]}`).join("\n")}\n\nCAREERS\n${c}\n\nRESOURCE CATALOG\n${r}\n\nCURRENT PAGE\n${WC.pageText}`;
+  }
+  function googleSearchText(q) {
+    window.open(
+      "https://www.google.com/search?q=" + encodeURIComponent(q),
+      "_blank",
+      "noopener",
+    );
+  }
+  function wcDetectAction(q) {
+    let m = q.trim().match(/^(?:open|go to|show|take me to)\s+(?:the\s+)?(.+)$/i);
+    if (m) {
+      const s = m[1].toLowerCase();
+      const maps = [
+        ["home", "home"],
+        ["careers", "discover"],
+        ["discover", "discover"],
+        ["target", "target"],
+        ["roadmap", "roadmap"],
+        ["workspace", "workspace"],
+        ["skills", "skills"],
+        ["gaps", "gaps"],
+        ["projects", "projects"],
+        ["applications", "applications"],
+        ["planner", "planner"],
+        ["assessment", "assessment"],
+        ["journal", "journal"],
+        ["analytics", "analytics"],
+        ["compare", "compare"],
+        ["saved careers", "saved"],
+        ["saved", "saved"],
+        ["profile", "profile"],
+        ["settings", "settings"],
+        ["market", "market"],
+        ["sources", "sources"],
+        ["arena", "arena"],
+        ["contests", "arena"],
+        ["leaderboard", "arena"],
+        ["dsa tracker", "dsa"],
+        ["dsa", "dsa"],
+        ["practice tracker", "dsa"],
+        ["heatmap", "dsa"],
+        ["problems", "dsa"],
+        ["courses", "courses"],
+        ["internships", "internships"],
+        ["hackathons", "hackathons"],
+        ["company offers", "companies"],
+      ];
+      const hit = maps.find(([k]) => s.includes(k));
+      if (hit) return { type: "nav", panel: hit[1], label: hit[0] };
+    }
+    m = q.trim().match(/^add\s+(?:a\s+)?task\s*[:\-]?\s*(.+)$/i);
+    if (m) return { type: "task", text: m[1] };
+    m = q.trim().match(/^add\s+(?:a\s+)?project\s*[:\-]?\s*(.+)$/i);
+    if (m) return { type: "project", text: m[1] };
+    m = q
+      .trim()
+      .match(
+        /^(?:set|make|choose)\s+(?:my\s+)?target\s+(?:career\s+)?(?:to|as)\s+(.+)$/i,
+      );
+    if (m) return { type: "target", text: m[1] };
+    m = q.trim().match(/^(?:search|google)\s+(?:google\s+)?(?:for\s+)?(.+)$/i);
+    if (m) return { type: "google", text: m[1] };
+    return null;
+  }
+  function wcExecuteAction(a) {
+    if (a.type === "nav") {
+      if (
+        [
+          "home",
+          "discover",
+          "target",
+          "arena",
+          "contests",
+          "workspace",
+          "market",
+          "sources",
+          "courses",
+          "internships",
+          "hackathons",
+          "companies",
+        ].includes(a.panel)
+      )
+        route(a.panel);
+      else {
+        route("workspace");
+        setTimeout(() => setPanel(a.panel), 0);
+      }
+      wcPush("assistant", `Done — I opened **${a.label}**.`);
+      return;
+    }
+    if (a.type === "task") {
+      state.tasks.push({ title: a.text.trim(), done: false });
+      save();
+      rerenderWorkspace("planner");
+      WC.route = "workspace";
+      WC.panel = "planner";
+      wcRefreshContext();
+      wcPush("assistant", `Added this task to Planner: **${a.text.trim()}**`);
+      return;
+    }
+    if (a.type === "project") {
+      state.projects.push({
+        id: cryptoSafeId(),
+        title: a.text.trim(),
+        desc: "Created through W-Combinators.",
+        status: "IDEA",
+        progress: 10,
+      });
+      save();
+      rerenderWorkspace("projects");
+      WC.route = "workspace";
+      WC.panel = "projects";
+      wcRefreshContext();
+      wcPush("assistant", `Created **${a.text.trim()}** in Project Studio.`);
+      return;
+    }
+    if (a.type === "target") {
+      const q = a.text.toLowerCase();
+      const c = careers.find(
+        (c) => q === c.id || q.includes(c.title.toLowerCase()),
+      );
+      if (c) {
+        setTargetRole(c.id);
+        route("target");
+        wcPush(
+          "assistant",
+          `Target set to **${c.title}** and the target roadmap is open.`,
+        );
+      } else {
+        googleSearchText(`${a.text} student career skills official`);
+        wcPush(
+          "assistant",
+          `I couldn't map **${a.text}** to a built-in HORIZON career, so I opened Google research.`,
+        );
+      }
+      return;
+    }
+    if (a.type === "google") {
+      googleSearchText(a.text);
+      wcPush("assistant", `Opened Google results for **${a.text}**.`);
+    }
+  }
+  function wcLocalAnswer(q) {
+    const x = q.toLowerCase();
+    if (/^(hi|hello|hey|yo)\b/.test(x))
+      return "Hey! 👋 Tell me the problem. I can guide you through HORIZON or help build a study plan.";
+    if (/who are you|what are you|w-combinators/.test(x))
+      return "I’m **W-Combinators**, the AI assistant built into HORIZON.";
+    if (/what can you do|help/.test(x))
+      return "I can navigate HORIZON, create tasks/projects, set target careers, explain HORIZON data, build study plans, take voice input, read answers aloud, and use Gemini + Google Search for broader educational questions.";
+    if (/where am i|current page|what page/.test(x))
+      return `You’re on **${WC.route}**${WC.panel ? ` → **${WC.panel}**` : ""}.`;
+    const kb = [
+      [
+        /photosynthesis/,
+        "Photosynthesis uses light energy to convert carbon dioxide and water into stored chemical energy in plants, releasing oxygen. I can explain it at school, NEET, or deeper level.",
+      ],
+      [
+        /newton.*laws?|laws?.*newton/,
+        "Newton’s three laws describe inertia, F=ma, and action–reaction pairs.",
+      ],
+      [
+        /quadratic/,
+        "A quadratic equation has the form ax² + bx + c = 0. The quadratic formula is x = (−b ± √(b²−4ac))/(2a).",
+      ],
+      [
+        /cell membrane|plasma membrane/,
+        "The plasma membrane is a selectively permeable phospholipid bilayer containing proteins and controlling movement of substances.",
+      ],
+      [
+        /noun|pronoun|adverb|adjective|conjunction/,
+        "Noun, pronoun, adjective, adverb and conjunction are parts of speech. I can also quiz you on them.",
+      ],
+    ];
+    for (const [re, ans] of kb) if (re.test(x)) return ans;
+    return "I’m in **local mode**. Website commands and built-in guidance work now; for open-ended educational answers, connect Gemini in ⚙ or use the Google button.";
+  }
+  function wcHistory() {
+    return wcChat
+      .slice(-12)
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: String(m.text || "") }],
+      }));
+  }
+  async function wcAskGemini(q, key) {
+    WC.busy = true;
+    wcAppendTyping();
+    const system = `You are W-Combinators, an educational AI agent inside HORIZON. Be fluent, problem-first, concise but helpful. Use the supplied HORIZON state as authoritative for HORIZON-specific facts and actions. Never invent site features or user data. For general education, teach clearly and step-by-step. Use Google Search grounding for current or niche facts. If a response can be solved directly from the site context, do that without unnecessary web search.
 
 HORIZON KNOWLEDGE:
 ${wcBuildKnowledge()}`;
-  const body = {
-    systemInstruction: { parts: [{ text: system }] },
-    contents: [...wcHistory(), { role: "user", parts: [{ text: q }] }],
-  };
-  const parse = async (r) => {
-    const d = await r.json();
-    if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
-    if (!d?.text) throw new Error("AI returned no text.");
-    return d;
-  };
-  try {
-    let d = null;
+    const body = {
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [...wcHistory(), { role: "user", parts: [{ text: q }] }],
+    };
+    const parse = async (r) => {
+      const d = await r.json();
+      if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
+      if (!d?.text) throw new Error("AI returned no text.");
+      return d;
+    };
     try {
-      const r = await fetch(WC.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: body.contents,
-          systemInstruction: body.systemInstruction,
-        }),
+      let d = null;
+      try {
+        const r = await fetch(WC.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: body.contents,
+            systemInstruction: body.systemInstruction,
+          }),
+        });
+        if (r.status !== 404 && r.status !== 405) d = await parse(r);
+      } catch (serverErr) { }
+      if (!d && key) {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${WC.model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": key,
+            },
+            body: JSON.stringify({
+              ...body,
+              tools: [{ google_search: {} }],
+              generationConfig: {
+                maxOutputTokens: 1800,
+                thinkingConfig: { thinkingLevel: "low" },
+              },
+            }),
+          },
+        );
+        d = await parse(r);
+        const chunks =
+          d?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+        d.sources = d.sources || [];
+        for (const c of chunks) {
+          const w = c?.web,
+            u = w?.uri || w?.url;
+          if (u && !d.sources.some((s) => s.url === u))
+            d.sources.push({ url: u, title: w.title || u });
+        }
+      }
+      if (!d)
+        throw new Error(
+          "No AI provider is connected. Add GEMINI_API_KEY on Netlify or connect a Gemini key in W-Combinators settings.",
+        );
+      wcRemoveTyping();
+      wcPush("assistant", d.text, {
+        sources: (d.sources || []).slice(0, 8),
+        searchUrl: "https://www.google.com/search?q=" + encodeURIComponent(q),
       });
-      if (r.status !== 404 && r.status !== 405) d = await parse(r);
-    } catch (serverErr) {}
-    if (!d && key) {
+      wcSetSubtitle(
+        d.grounded
+          ? "Answered · Google-grounded"
+          : d.model
+            ? "Answered · Gemini"
+            : "Answered · AI",
+      );
+    } catch (e) {
+      wcRemoveTyping();
+      wcPush(
+        "assistant",
+        `I couldn’t reach the live AI service. **Your HORIZON data was not changed.**\n\n${String(e.message || e)}\n\nYou can still use website commands and local educational guidance, or connect Gemini in ⚙.`,
+      );
+      wcSetSubtitle("Web guide · study co-pilot");
+    } finally {
+      WC.busy = false;
+      wcRefreshContext();
+    }
+  }
+  async function wcSend() {
+    if (WC.busy) return;
+    const i = document.getElementById("wcInput");
+    const q = (i?.value || "").trim();
+    if (!q) return;
+    i.value = "";
+    wcAutoResize();
+    wcPush("user", q);
+    const a = wcDetectAction(q);
+    if (a) {
+      wcExecuteAction(a);
+      return;
+    }
+    const key = wcGetKey();
+    const serverKnown = location.protocol.startsWith("http");
+    if (!serverKnown && !key) {
+      wcPush("assistant", wcLocalAnswer(q), {
+        searchUrl: "https://www.google.com/search?q=" + encodeURIComponent(q),
+      });
+      return;
+    }
+    await wcAskGemini(q, key);
+  }
+  function wcSaveApiKey() {
+    const i = document.getElementById("wcApiKey"),
+      key = (i?.value || "").trim();
+    if (!key) {
+      toast("Paste a Gemini API key first.");
+      return;
+    }
+    try {
+      sessionStorage.setItem(WC.keyStore, key);
+    } catch (e) {
+      try {
+        localStorage.setItem(WC.keyStore, key);
+      } catch (_e) { }
+    }
+    wcRefreshContext();
+    wcSetSubtitle("Gemini connected · ready");
+    toast("W-Combinators is connected.");
+  }
+  function wcRemoveApiKey() {
+    try {
+      sessionStorage.removeItem(WC.keyStore);
+      localStorage.removeItem(WC.keyStore);
+    } catch (e) { }
+    const i = document.getElementById("wcApiKey");
+    if (i) i.value = "";
+    wcRefreshContext();
+    toast("Gemini key removed.");
+  }
+  async function wcTestApi() {
+    const key = (document.getElementById("wcApiKey")?.value || wcGetKey()).trim();
+    if (!key) {
+      toast("Add a Gemini API key first.");
+      return;
+    }
+    toast("Testing Gemini…");
+    try {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${WC.model}:generateContent`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": key,
-          },
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
           body: JSON.stringify({
-            ...body,
-            tools: [{ google_search: {} }],
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: "Reply exactly: W-COMBINATORS ONLINE" }],
+              },
+            ],
             generationConfig: {
-              maxOutputTokens: 1800,
+              maxOutputTokens: 20,
               thinkingConfig: { thinkingLevel: "low" },
             },
           }),
         },
       );
-      d = await parse(r);
-      const chunks =
-        d?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-      d.sources = d.sources || [];
-      for (const c of chunks) {
-        const w = c?.web,
-          u = w?.uri || w?.url;
-        if (u && !d.sources.some((s) => s.url === u))
-          d.sources.push({ url: u, title: w.title || u });
-      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      wcSaveApiKey();
+      toast("Connection works — W-Combinators is online.");
+    } catch (e) {
+      toast("Connection failed: " + String(e.message || e).slice(0, 150));
     }
-    if (!d)
-      throw new Error(
-        "No AI provider is connected. Add GEMINI_API_KEY on Netlify or connect a Gemini key in W-Combinators settings.",
-      );
-    wcRemoveTyping();
-    wcPush("assistant", d.text, {
-      sources: (d.sources || []).slice(0, 8),
-      searchUrl: "https://www.google.com/search?q=" + encodeURIComponent(q),
-    });
-    wcSetSubtitle(
-      d.grounded
-        ? "Answered · Google-grounded"
-        : d.model
-          ? "Answered · Gemini"
-          : "Answered · AI",
-    );
-  } catch (e) {
-    wcRemoveTyping();
-    wcPush(
-      "assistant",
-      `I couldn’t reach the live AI service. **Your HORIZON data was not changed.**\n\n${String(e.message || e)}\n\nYou can still use website commands and local educational guidance, or connect Gemini in ⚙.`,
-    );
-    wcSetSubtitle("Web guide · study co-pilot");
-  } finally {
-    WC.busy = false;
+  }
+  function wcBind() {
+    wcInitVoice();
+    const i = document.getElementById("wcInput");
+    if (i) {
+      i.addEventListener("input", wcAutoResize);
+      i.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          wcSend();
+        }
+      });
+    }
+    wcRenderChat();
     wcRefreshContext();
   }
-}
-async function wcSend() {
-  if (WC.busy) return;
-  const i = document.getElementById("wcInput");
-  const q = (i?.value || "").trim();
-  if (!q) return;
-  i.value = "";
-  wcAutoResize();
-  wcPush("user", q);
-  const a = wcDetectAction(q);
-  if (a) {
-    wcExecuteAction(a);
-    return;
+  function wcSyncRoute(name) {
+    WC.route = name || "home";
+    setTimeout(wcRefreshContext, 0);
   }
-  const key = wcGetKey();
-  const serverKnown = location.protocol.startsWith("http");
-  if (!serverKnown && !key) {
-    wcPush("assistant", wcLocalAnswer(q), {
-      searchUrl: "https://www.google.com/search?q=" + encodeURIComponent(q),
-    });
-    return;
+  function wcSyncPanel(name) {
+    WC.panel = name || "";
+    setTimeout(wcRefreshContext, 0);
   }
-  await wcAskGemini(q, key);
-}
-function wcSaveApiKey() {
-  const i = document.getElementById("wcApiKey"),
-    key = (i?.value || "").trim();
-  if (!key) {
-    toast("Paste a Gemini API key first.");
-    return;
-  }
-  try {
-    sessionStorage.setItem(WC.keyStore, key);
-  } catch (e) {
-    try {
-      localStorage.setItem(WC.keyStore, key);
-    } catch (_e) {}
-  }
-  wcRefreshContext();
-  wcSetSubtitle("Gemini connected · ready");
-  toast("W-Combinators is connected.");
-}
-function wcRemoveApiKey() {
-  try {
-    sessionStorage.removeItem(WC.keyStore);
-    localStorage.removeItem(WC.keyStore);
-  } catch (e) {}
-  const i = document.getElementById("wcApiKey");
-  if (i) i.value = "";
-  wcRefreshContext();
-  toast("Gemini key removed.");
-}
-async function wcTestApi() {
-  const key = (document.getElementById("wcApiKey")?.value || wcGetKey()).trim();
-  if (!key) {
-    toast("Add a Gemini API key first.");
-    return;
-  }
-  toast("Testing Gemini…");
-  try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${WC.model}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: "Reply exactly: W-COMBINATORS ONLINE" }],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 20,
-            thinkingConfig: { thinkingLevel: "low" },
-          },
-        }),
-      },
-    );
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    wcSaveApiKey();
-    toast("Connection works — W-Combinators is online.");
-  } catch (e) {
-    toast("Connection failed: " + String(e.message || e).slice(0, 150));
-  }
-}
-function wcBind() {
-  wcInitVoice();
-  const i = document.getElementById("wcInput");
-  if (i) {
-    i.addEventListener("input", wcAutoResize);
-    i.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        wcSend();
-      }
-    });
-  }
-  wcRenderChat();
-  wcRefreshContext();
-}
-function wcSyncRoute(name) {
-  WC.route = name || "home";
-  setTimeout(wcRefreshContext, 0);
-}
-function wcSyncPanel(name) {
-  WC.panel = name || "";
-  setTimeout(wcRefreshContext, 0);
-}
-const __wcRoute = route;
-route = function (name) {
-  __wcRoute(name);
-  wcSyncRoute(name);
-};
-const __wcSetPanel = setPanel;
-setPanel = function (id) {
-  __wcSetPanel(id);
-  wcSyncPanel(id);
-};
+  const __wcRoute = route;
+  route = function (name) {
+    __wcRoute(name);
+    wcSyncRoute(name);
+  };
+  const __wcSetPanel = setPanel;
+  setPanel = function (id) {
+    __wcSetPanel(id);
+    wcSyncPanel(id);
+  };
 
-boot();
-wcBind();
-wcRefreshContext();
+  boot();
+  wcBind();
+  wcRefreshContext();
